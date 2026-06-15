@@ -1,0 +1,104 @@
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import pb from '../lib/pocketbase';
+import { useAuth } from './AuthContext';
+
+const ProgramContext = createContext(null);
+
+export function ProgramProvider({ children }) {
+  const { user } = useAuth();
+  const [programs, setPrograms] = useState([]);
+  const [activeProgram, setActiveProgram] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadPrograms = useCallback(async () => {
+    if (!user) {
+      setPrograms([]);
+      setActiveProgram(null);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      let list = [];
+      if (user.role === 'coordinator' || user.role === 'program_head') {
+        list = await pb.collection('programs').getFullList({ 
+          sort: 'name',
+          filter: `head = "${user.id}"`
+        });
+      } else if (user.role === 'instructor') {
+        const coursesList = await pb.collection('courses').getFullList({
+          filter: `instructor ~ "${user.id}"`,
+          expand: 'program',
+          requestKey: null
+        });
+        const programMap = {};
+        coursesList.forEach(c => {
+          if (c.expand?.program) {
+            programMap[c.expand.program.id] = c.expand.program;
+          }
+        });
+        list = Object.values(programMap).sort((a, b) => a.name.localeCompare(b.name));
+      } else {
+        setPrograms([]);
+        setActiveProgram(null);
+        setLoading(false);
+        return;
+      }
+      setPrograms(list);
+      
+      // Determine default active program
+      const savedProgId = localStorage.getItem('medek_active_program_id');
+      if (savedProgId) {
+        const found = list.find(p => p.id === savedProgId);
+        if (found) {
+          setActiveProgram(found);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // If no saved program or not found, pick the first one
+      if (list.length > 0) {
+        setActiveProgram(list[0]);
+        localStorage.setItem('medek_active_program_id', list[0].id);
+      } else {
+        setActiveProgram(null);
+      }
+    } catch (err) {
+      console.error('Error loading programs in ProgramContext:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadPrograms();
+  }, [loadPrograms]);
+
+  const selectProgram = useCallback((progId) => {
+    const found = programs.find(p => p.id === progId);
+    if (found) {
+      setActiveProgram(found);
+      localStorage.setItem('medek_active_program_id', progId);
+    } else if (progId === '') {
+      setActiveProgram(null);
+      localStorage.removeItem('medek_active_program_id');
+    }
+  }, [programs]);
+
+  const value = useMemo(() => ({
+    programs,
+    activeProgram,
+    selectProgram,
+    loading,
+    refreshPrograms: loadPrograms
+  }), [programs, activeProgram, selectProgram, loading, loadPrograms]);
+
+  return (
+    <ProgramContext.Provider value={value}>
+      {children}
+    </ProgramContext.Provider>
+  );
+}
+
+export const useProgram = () => useContext(ProgramContext);

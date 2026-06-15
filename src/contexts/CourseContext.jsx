@@ -1,0 +1,91 @@
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import pb from '../lib/pocketbase';
+import { useAuth } from './AuthContext';
+import { useTerm } from './TermContext';
+import { useProgram } from './ProgramContext';
+
+const CourseContext = createContext(null);
+
+export function CourseProvider({ children }) {
+  const { user } = useAuth();
+  const { activeTerm } = useTerm();
+  const { activeProgram } = useProgram();
+  const [courses, setCourses] = useState([]);
+  const [activeCourse, setActiveCourse] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadCourses = useCallback(async () => {
+    if (!user || !activeTerm) {
+      setCourses([]);
+      setActiveCourse(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const filterParts = [`instructor ~ "${user.id}"`, `term = "${activeTerm.id}"`];
+      if (activeProgram?.id) {
+        filterParts.push(`program = "${activeProgram.id}"`);
+      }
+      const list = await pb.collection('courses').getFullList({ 
+        sort: 'code',
+        filter: filterParts.join(' && '),
+        expand: 'program',
+        requestKey: null
+      });
+      setCourses(list);
+      
+      const savedCourseId = localStorage.getItem(`medek_active_course_id_${user.id}_${activeTerm.id}`);
+      if (savedCourseId) {
+        const found = list.find(c => c.id === savedCourseId);
+        if (found) {
+          setActiveCourse(found);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      if (list.length > 0) {
+        setActiveCourse(list[0]);
+        localStorage.setItem(`medek_active_course_id_${user.id}_${activeTerm.id}`, list[0].id);
+      } else {
+        setActiveCourse(null);
+      }
+    } catch (err) {
+      console.error('Error loading courses in CourseContext:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, activeTerm, activeProgram]);
+
+  useEffect(() => {
+    loadCourses();
+  }, [loadCourses]);
+
+  const selectCourse = useCallback((courseId) => {
+    const found = courses.find(c => c.id === courseId);
+    if (found) {
+      setActiveCourse(found);
+      localStorage.setItem(`medek_active_course_id_${user?.id}_${activeTerm?.id}`, courseId);
+    } else if (courseId === '') {
+      setActiveCourse(null);
+      localStorage.removeItem(`medek_active_course_id_${user?.id}_${activeTerm?.id}`);
+    }
+  }, [courses, user, activeTerm]);
+
+  const value = useMemo(() => ({
+    courses,
+    activeCourse,
+    selectCourse,
+    loading,
+    refreshCourses: loadCourses
+  }), [courses, activeCourse, selectCourse, loading, loadCourses]);
+
+  return (
+    <CourseContext.Provider value={value}>
+      {children}
+    </CourseContext.Provider>
+  );
+}
+
+export const useActiveCourse = () => useContext(CourseContext);
