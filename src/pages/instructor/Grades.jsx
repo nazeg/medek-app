@@ -18,22 +18,64 @@ export default function Grades() {
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyGrades, setDirtyGrades] = useState(new Set());
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [studentForm, setStudentForm] = useState({ number: '', name: '', email: '' });
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    pb.collection('students').getFullList({ sort: 'number' }).then(setStudents);
-  }, []);
-
-  useEffect(() => {
-    if (!activeCourse?.id) {
+  const loadStudentsForCourse = async (courseId) => {
+    if (!courseId) {
+      setStudents([]);
       setExams([]);
       setSelectedExam('');
       return;
     }
-    pb.collection('exams').getFullList({ filter: `course = "${activeCourse.id}"`, sort: 'type' }).then(e => {
-      setExams(e);
+
+    try {
+      // 1. Fetch exams for this course
+      const courseExams = await pb.collection('exams').getFullList({
+        filter: `course = "${courseId}"`,
+        sort: 'type'
+      });
+      setExams(courseExams);
+
+      // 2. Fetch student IDs who have grades in this course
+      let studentIdsFromGrades = [];
+      if (courseExams.length > 0) {
+        const examFilter = courseExams.map(e => `exam = "${e.id}"`).join(' || ');
+        const grList = await pb.collection('student_grades').getFullList({
+          filter: examFilter
+        }).catch(() => []);
+        studentIdsFromGrades = Array.from(new Set(grList.map(g => g.student)));
+      }
+
+      // 3. Fetch students who are linked to this course OR have grades in it
+      let filter = `courses ~ "${courseId}"`;
+      if (studentIdsFromGrades.length > 0) {
+        filter += ` || ` + studentIdsFromGrades.map(id => `id = "${id}"`).join(' || ');
+      }
+
+      const list = await pb.collection('students').getFullList({
+        filter: filter,
+        sort: 'number'
+      }).catch(() => []);
+
+      setStudents(list);
+    } catch (err) {
+      console.error('Error loading course students:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeCourse?.id) {
       setSelectedExam('');
-    });
+      setGrades({});
+      setDirtyGrades(new Set());
+      loadStudentsForCourse(activeCourse.id);
+    } else {
+      setStudents([]);
+      setExams([]);
+      setSelectedExam('');
+    }
   }, [activeCourse]);
 
   useEffect(() => {
@@ -94,14 +136,71 @@ export default function Grades() {
     }
   };
 
+  const handleSaveStudent = async (e) => {
+    e.preventDefault();
+    if (!activeCourse) return;
+    const num = studentForm.number.trim();
+    const name = studentForm.name.trim();
+    if (!num || !name) {
+      alert('Öğrenci Numarası ve Ad Soyad alanları zorunludur.', 'Hata', 'warning');
+      return;
+    }
+
+    try {
+      const existing = await pb.collection('students').getFirstListItem(`number = "${num}"`).catch(() => null);
+      if (existing) {
+        const currentCourses = Array.isArray(existing.courses) ? existing.courses : [];
+        if (!currentCourses.includes(activeCourse.id)) {
+          await pb.collection('students').update(existing.id, {
+            courses: [...currentCourses, activeCourse.id],
+            name: name || existing.name,
+            email: studentForm.email.trim() || existing.email
+          });
+        }
+      } else {
+        await pb.collection('students').create({
+          number: num,
+          name: name,
+          email: studentForm.email.trim(),
+          courses: [activeCourse.id]
+        });
+      }
+
+      setShowAddStudentModal(false);
+      setStudentForm({ number: '', name: '', email: '' });
+      await loadStudentsForCourse(activeCourse.id);
+      alert('Öğrenci bu derse başarıyla eklendi.', 'Başarılı', 'success');
+    } catch (err) {
+      console.error('Error adding student:', err);
+      alert('Öğrenci eklenirken bir hata oluştu: ' + err.message, 'Hata', 'error');
+    }
+  };
+
   const handleDeleteStudent = async (studentId, studentName) => {
-    if (await confirm(`"${studentName}" isimli öğrenciyi sistemden silmek istediğinize emin misiniz? Bu işlem öğrenciye ait tüm notları da silecektir.`)) {
+    if (!activeCourse) return;
+    if (await confirm(`"${studentName}" isimli öğrenciyi bu dersten çıkarmak istediğinize emin misiniz? Bu işlem öğrencinin bu dersteki sınav notlarını silecektir.`)) {
       try {
-        await pb.collection('students').delete(studentId);
+        // 1. Remove course from student's courses array
+        const st = await pb.collection('students').getOne(studentId).catch(() => null);
+        if (st && Array.isArray(st.courses)) {
+          const nextCourses = st.courses.filter(cid => cid !== activeCourse.id);
+          await pb.collection('students').update(studentId, { courses: nextCourses });
+        }
+        
+        // 2. Delete student grades in this course's exams
+        if (exams.length > 0) {
+          const examIdsFilter = exams.map(e => `exam = "${e.id}"`).join(' || ');
+          const gradesToDelete = await pb.collection('student_grades').getFullList({
+            filter: `student = "${studentId}" && (${examIdsFilter})`
+          }).catch(() => []);
+          await Promise.all(gradesToDelete.map(g => pb.collection('student_grades').delete(g.id)));
+        }
+
         setStudents(prev => prev.filter(s => s.id !== studentId));
+        alert('Öğrenci bu dersten başarıyla çıkarıldı.', 'Başarılı', 'success');
       } catch (err) {
-        console.error('Error deleting student:', err);
-        alert('Öğrenci silinirken bir hata oluştu: ' + err.message, 'Hata', 'error');
+        console.error('Error removing student from course:', err);
+        alert('Öğrenci çıkarılırken hata oluştu: ' + err.message, 'Hata', 'error');
       }
     }
   };
@@ -265,7 +364,7 @@ export default function Grades() {
 
   const handleFileImport = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedExam) return;
+    if (!file || !selectedExam || !activeCourse) return;
     setImporting(true);
 
     try {
@@ -280,14 +379,39 @@ export default function Grades() {
       let errorCount = 0;
 
       for (const row of rows) {
-        // Read Student Number
+        // Read Student Number & Name
         const rawNo = String(row['Öğrenci No'] || row['Student No'] || row['no'] || '').trim();
         if (!rawNo) continue;
+        const rawName = String(row['Ad Soyad'] || row['Name'] || row['name'] || '').trim();
 
-        const student = students.find(s => s.number === rawNo);
+        let student = students.find(s => s.number === rawNo);
         if (!student) {
-          errorCount++;
-          continue;
+          try {
+            const existing = await pb.collection('students').getFirstListItem(`number = "${rawNo}"`).catch(() => null);
+            if (existing) {
+              student = existing;
+              const currentCourses = Array.isArray(existing.courses) ? existing.courses : [];
+              if (!currentCourses.includes(activeCourse.id)) {
+                await pb.collection('students').update(existing.id, { courses: [...currentCourses, activeCourse.id] });
+              }
+            } else {
+              student = await pb.collection('students').create({
+                number: rawNo,
+                name: rawName || `Öğrenci ${rawNo}`,
+                courses: [activeCourse.id]
+              });
+            }
+          } catch (err) {
+            console.error('Error finding/creating student:', err);
+            errorCount++;
+            continue;
+          }
+        } else {
+          // Ensure activeCourse is present in student's courses
+          const currentCourses = Array.isArray(student.courses) ? student.courses : [];
+          if (!currentCourses.includes(activeCourse.id)) {
+            await pb.collection('students').update(student.id, { courses: [...currentCourses, activeCourse.id] }).catch(() => {});
+          }
         }
 
         // For each key in the row, check if it matches a question
@@ -299,7 +423,7 @@ export default function Grades() {
           const qCode = match ? match[1] : key;
 
           const question = questions.find(q => (q.code || `S${q.number}`).toLowerCase() === qCode.toLowerCase());
-          if (question) {
+          if (question && student) {
             const rawVal = row[key];
             const rawValStr = String(rawVal !== undefined && rawVal !== null ? rawVal : '').trim();
             if (rawValStr !== '') {
@@ -336,10 +460,11 @@ export default function Grades() {
         });
       }
 
+      await loadStudentsForCourse(activeCourse.id);
       setGrades(updatedGrades);
       setDirtyGrades(newDirty);
       if (errorCount > 0) {
-        alert(`${errorCount} öğrenci sistemde bulunamadığı için atlandı. ${updatedCount} not yükleme önbelleğine alındı. Kaydetmek için 'Notları Kaydet' butonuna basınız.`, 'Aktarım Tamamlandı', 'warning');
+        alert(`${errorCount} öğrenci işlenemedi. ${updatedCount} not yükleme önbelleğine alındı. Kaydetmek için 'Notları Kaydet' butonuna basınız.`, 'Aktarım Tamamlandı', 'warning');
       } else {
         alert(`${updatedCount} not başarıyla yüklendi. Kaydetmek için 'Notları Kaydet' butonuna basınız.`, 'Başarılı', 'success');
       }
@@ -357,7 +482,7 @@ export default function Grades() {
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-headline-lg text-on-surface">Not Girişi</h2>
-          <p className="text-on-surface-variant mt-1 font-body-md">Öğrenci bazlı not girişi</p>
+          <p className="text-on-surface-variant mt-1 font-body-md">Öğrenci bazlı not girişi ve ders listesi yönetimi</p>
         </div>
       </div>
       <div className="bg-white rounded-xl border border-outline-variant p-6 shadow-sm">
@@ -378,7 +503,16 @@ export default function Grades() {
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            {activeCourse && (
+              <button
+                onClick={() => { setStudentForm({ number: '', name: '', email: '' }); setShowAddStudentModal(true); }}
+                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 flex items-center gap-1.5 active:scale-95 transition-all"
+                title="Bu Derse Yeni Öğrenci Ekle"
+              >
+                <span className="material-symbols-outlined text-base">person_add</span> Öğrenci Ekle
+              </button>
+            )}
             {selectedExam && (
               <>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileImport} className="hidden" />
@@ -449,10 +583,10 @@ export default function Grades() {
                                       const scoreMap = { 'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5, '': 0 };
                                       setGrade(student.id, q.id, scoreMap[val] || 0);
                                     }}
-                                    className="w-10 h-7 mx-auto block text-center text-xs bg-white bg-none font-semibold cursor-pointer appearance-none border-0 outline-none p-0"
+                                    className="w-11 h-7 mx-auto block text-center text-xs bg-white border-0 outline-none p-0"
                                     style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}
                                   >
-                                    <option value="">—</option>
+                                    <option value="">-</option>
                                     <option value="A">A</option>
                                     <option value="B">B</option>
                                     <option value="C">C</option>
@@ -462,24 +596,23 @@ export default function Grades() {
                                 </td >
                               );
                             } else if (q.type === 'Doğru/Yanlış') {
+                              const isCorrect = parseInt(currentScore) === q.max_score;
                               return (
                                 <td key={q.id} className="px-0.5 py-1 text-center">
                                   <select
-                                    value={currentScore === q.max_score ? (q.answer || 'Doğru') : ''}
+                                    value={currentScore === '' ? '' : (isCorrect ? (q.answer || 'Doğru') : (q.answer === 'Doğru' ? 'Yanlış' : 'Doğru'))}
                                     onChange={e => {
                                       const val = e.target.value;
-                                      if (val === '') {
-                                        setGrade(student.id, q.id, 0);
-                                      } else if (val === (q.answer || 'Doğru')) {
-                                        setGrade(student.id, q.id, q.max_score);
-                                      } else {
-                                        setGrade(student.id, q.id, 0);
+                                      if (val === '') setGrade(student.id, q.id, '');
+                                      else {
+                                        const correct = (q.answer || 'Doğru').toLowerCase();
+                                        setGrade(student.id, q.id, val.toLowerCase() === correct ? q.max_score : 0);
                                       }
                                     }}
-                                    className="w-12 h-7 mx-auto block text-center text-xs bg-white bg-none font-semibold cursor-pointer appearance-none border-0 outline-none p-0"
+                                    className="w-16 h-7 mx-auto block text-center text-xs bg-white border-0 outline-none p-0"
                                     style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}
                                   >
-                                    <option value="">—</option>
+                                    <option value="">-</option>
                                     <option value="Doğru">Doğru</option>
                                     <option value="Yanlış">Yanlış</option>
                                   </select>
@@ -505,13 +638,20 @@ export default function Grades() {
                           <button
                             onClick={() => handleDeleteStudent(student.id, student.name)}
                             className="p-1 hover:bg-error/10 text-error rounded transition-all inline-flex items-center justify-center active:scale-95"
-                            title="Öğrenciyi Sil"
+                            title="Öğrenciyi Bu Dersten Çıkar"
                           >
                             <span className="material-symbols-outlined text-lg">delete</span>
                           </button>
                         </td>
                       </tr>
                     ))}
+                    {students.length === 0 && (
+                      <tr>
+                        <td colSpan={questions.length + 3} className="px-4 py-8 text-center text-on-surface-variant text-xs">
+                          Bu derse henüz öğrenci eklenmemiştir. "+ Öğrenci Ekle" veya "Şablondan Aktar" butonlarını kullanarak öğrenci ekleyebilirsiniz.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -519,9 +659,97 @@ export default function Grades() {
             {selectedExam && questions.length === 0 && (
               <p className="text-center py-8 text-on-surface-variant">Bu sınava ait soru bulunamadı. Önce soruları tanımlayın.</p>
             )}
+            {!selectedExam && (
+              <div className="border border-outline-variant/60 rounded-xl p-6 bg-slate-50/50 text-center">
+                <span className="material-symbols-outlined text-3xl text-slate-400 block mb-1">assignment</span>
+                <p className="text-sm font-semibold text-slate-700">Not girmek için lütfen yukarıdan bir sınav seçiniz.</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">Bu derse kayıtlı {students.length} öğrenci bulunmaktadır.</p>
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* Add Student Modal */}
+      {showAddStudentModal && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { e.currentTarget.dataset.clicked = e.target === e.currentTarget ? 'true' : 'false'; }}
+          onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.clicked === 'true') setShowAddStudentModal(false); }}
+        >
+          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-600">person_add</span>
+                <h3 className="font-bold text-slate-800 text-base">Derse Öğrenci Ekle</h3>
+              </div>
+              <button onClick={() => setShowAddStudentModal(false)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleSaveStudent}>
+              <div className="p-6 space-y-4">
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/15 text-xs text-primary font-medium">
+                  <strong>Seçili Ders:</strong> {activeCourse?.code} - {activeCourse?.name}
+                </div>
+                <div>
+                  <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold text-xs">
+                    Öğrenci Numarası *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.number}
+                    onChange={e => setStudentForm({ ...studentForm, number: e.target.value })}
+                    placeholder="Örn: 20230101001"
+                    className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm font-mono focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold text-xs">
+                    Ad Soyad *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.name}
+                    onChange={e => setStudentForm({ ...studentForm, name: e.target.value })}
+                    placeholder="Örn: Ahmet Yılmaz"
+                    className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold text-xs">
+                    E-posta (İsteğe Bağlı)
+                  </label>
+                  <input
+                    type="email"
+                    value={studentForm.email}
+                    onChange={e => setStudentForm({ ...studentForm, email: e.target.value })}
+                    placeholder="Örn: ahmet@universite.edu.tr"
+                    className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-1 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-outline-variant bg-slate-50 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddStudentModal(false)}
+                  className="px-4 py-2 border border-outline-variant rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-600/20"
+                >
+                  Kaydet ve Ekle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

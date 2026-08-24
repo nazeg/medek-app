@@ -208,7 +208,7 @@ export default function InstructorReports() {
     try {
       const programId = selectedCourse.program;
       
-      const [pcs, dcs, matrix, questions, students, grades] = await Promise.all([
+      const [pcs, dcs, matrix, questions, rawStudents, grades] = await Promise.all([
         pb.collection('program_outcomes').getFullList({ filter: `program = "${programId}"`, sort: 'code' }),
         pb.collection('course_outcomes').getFullList({ filter: `course = "${selectedCourse.id}"`, sort: 'code' }),
         pb.collection('pc_dc_matrix').getFullList({ filter: `program = "${programId}"` }),
@@ -216,6 +216,12 @@ export default function InstructorReports() {
         pb.collection('students').getFullList({ sort: 'number' }),
         pb.collection('student_grades').getFullList({ filter: `exam.course = "${selectedCourse.id}"` })
       ]);
+
+      const students = rawStudents.filter(s => {
+        if (Array.isArray(s.courses) && s.courses.includes(selectedCourse.id)) return true;
+        if (grades.some(g => g.student === s.id)) return true;
+        return false;
+      });
 
       pcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
       dcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
@@ -587,13 +593,19 @@ export default function InstructorReports() {
         pcs.forEach(pc => { termSummaryMap[term.id][pc.code] = { wSum: 0, wAkts: 0 }; });
 
         for (const course of courses) {
-          const [dcs, matrix, questions, students, grades] = await Promise.all([
+          const [dcs, matrix, questions, rawStudents, grades] = await Promise.all([
             pb.collection('course_outcomes').getFullList({ filter: `course = "${course.id}"` }),
             pb.collection('pc_dc_matrix').getFullList({ filter: `program = "${selectedProgram.id}"` }),
             pb.collection('questions').getFullList({ filter: `exam.course = "${course.id}"`, expand: 'exam,course_outcome' }),
             pb.collection('students').getFullList(),
             pb.collection('student_grades').getFullList({ filter: `exam.course = "${course.id}"` })
           ]);
+
+          const students = rawStudents.filter(s => {
+            if (Array.isArray(s.courses) && s.courses.includes(course.id)) return true;
+            if (grades.some(g => g.student === s.id)) return true;
+            return false;
+          });
 
           if (dcs.length === 0 || questions.length === 0 || students.length === 0) continue;
 

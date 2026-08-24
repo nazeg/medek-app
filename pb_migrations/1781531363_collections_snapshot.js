@@ -1910,6 +1910,20 @@ migrate((app) => {
           "required": false,
           "system": false,
           "type": "text"
+        },
+        {
+          "cascadeDelete": false,
+          "collectionId": "pbc_2881267499",
+          "help": "",
+          "hidden": false,
+          "id": "relation_students_courses",
+          "maxSelect": 200,
+          "minSelect": 0,
+          "name": "courses",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "relation"
         }
       ],
       "id": "pbc_3827815851",

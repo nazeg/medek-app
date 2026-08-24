@@ -88,9 +88,8 @@ export default function InstructorDashboard() {
             const courseExams = examsList.filter(e => e.course === c.id);
             const courseExamIds = new Set(courseExams.map(e => e.id));
             const distinctStudents = new Set(studentGradesList.filter(g => courseExamIds.has(g.exam)).map(g => g.student));
-            
-            // Count graded students or total system students
-            const count = distinctStudents.size > 0 ? distinctStudents.size : allStudentsList.length;
+            const enrolledStudents = allStudentsList.filter(s => Array.isArray(s.courses) && s.courses.includes(c.id));
+            const count = enrolledStudents.length > 0 ? enrolledStudents.length : distinctStudents.size;
 
             courseStats[c.id] = {
               dcs: courseDcs.length,
