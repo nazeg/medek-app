@@ -17,6 +17,7 @@ export default function CoordinatorCourses() {
   const [terms, setTerms] = useState([]);
   const [faculties, setFaculties] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ code: '', name: '', sube: '', credits: '', akts: '', program: '', instructor: [], term: '', sinif: '1', pct_vize: '', pct_odev: '', pct_uygulama: '', pct_final: '', pct_but: '' });
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
