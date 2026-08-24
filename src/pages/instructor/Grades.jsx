@@ -19,8 +19,53 @@ export default function Grades() {
   const [saving, setSaving] = useState(false);
   const [dirtyGrades, setDirtyGrades] = useState(new Set());
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
-  const [studentForm, setStudentForm] = useState({ number: '', name: '', email: '' });
+  const [studentForm, setStudentForm] = useState({ number: '', name: '', email: '', id: null });
+  const [editingCell, setEditingCell] = useState(null); // { studentId, field: 'number'|'name', value }
   const fileInputRef = useRef(null);
+
+  const handleStartEdit = (student, field) => {
+    setEditingCell({
+      studentId: student.id,
+      field: field,
+      value: student[field] || ''
+    });
+  };
+
+  const handleSaveInlineEdit = async () => {
+    if (!editingCell) return;
+    const { studentId, field, value } = editingCell;
+    const trimmed = value.trim();
+
+    const original = students.find(s => s.id === studentId);
+    if (!original) {
+      setEditingCell(null);
+      return;
+    }
+
+    if (trimmed === (original[field] || '')) {
+      setEditingCell(null);
+      return;
+    }
+
+    if (!trimmed) {
+      alert(field === 'number' ? 'Öğrenci numarası boş bırakılamaz.' : 'Öğrenci adı boş bırakılamaz.', 'Uyarı', 'warning');
+      setEditingCell(null);
+      return;
+    }
+
+    try {
+      await pb.collection('students').update(studentId, {
+        [field]: trimmed
+      });
+
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, [field]: trimmed } : s));
+    } catch (err) {
+      console.error('Error updating student:', err);
+      alert('Öğrenci güncellenirken bir hata oluştu: ' + err.message, 'Hata', 'error');
+    } finally {
+      setEditingCell(null);
+    }
+  };
 
   const loadStudentsForCourse = async (courseId) => {
     if (!courseId) {
@@ -70,6 +115,7 @@ export default function Grades() {
       setSelectedExam('');
       setGrades({});
       setDirtyGrades(new Set());
+      setEditingCell(null);
       loadStudentsForCourse(activeCourse.id);
     } else {
       setStudents([]);
@@ -147,6 +193,19 @@ export default function Grades() {
     }
 
     try {
+      if (studentForm.id) {
+        await pb.collection('students').update(studentForm.id, {
+          number: num,
+          name: name,
+          email: studentForm.email.trim()
+        });
+        setShowAddStudentModal(false);
+        setStudentForm({ number: '', name: '', email: '', id: null });
+        await loadStudentsForCourse(activeCourse.id);
+        alert('Öğrenci bilgileri başarıyla güncellendi.', 'Başarılı', 'success');
+        return;
+      }
+
       const existing = await pb.collection('students').getFirstListItem(`number = "${num}"`).catch(() => null);
       if (existing) {
         const currentCourses = Array.isArray(existing.courses) ? existing.courses : [];
@@ -167,12 +226,12 @@ export default function Grades() {
       }
 
       setShowAddStudentModal(false);
-      setStudentForm({ number: '', name: '', email: '' });
+      setStudentForm({ number: '', name: '', email: '', id: null });
       await loadStudentsForCourse(activeCourse.id);
       alert('Öğrenci bu derse başarıyla eklendi.', 'Başarılı', 'success');
     } catch (err) {
-      console.error('Error adding student:', err);
-      alert('Öğrenci eklenirken bir hata oluştu: ' + err.message, 'Hata', 'error');
+      console.error('Error adding/updating student:', err);
+      alert('İşlem sırasında bir hata oluştu: ' + err.message, 'Hata', 'error');
     }
   };
 
@@ -564,9 +623,67 @@ export default function Grades() {
                   </thead>
                   <tbody className="divide-y divide-outline-variant">
                     {students.map(student => (
-                      <tr key={student.id} className="hover:bg-surface-container-low/50">
-                        <td className="px-4 py-3 text-on-surface-variant font-mono">{student.number}</td>
-                        <td className="px-4 py-3 font-bold">{student.name}</td>
+                      <tr key={student.id} className="hover:bg-surface-container-low/50 group/row">
+                        {/* Student Number - Inline editable on click/hover */}
+                        <td 
+                          className="px-4 py-2.5 text-on-surface-variant font-mono relative group/cell cursor-pointer hover:bg-primary/5 transition-colors select-none"
+                          onClick={() => !editingCell && handleStartEdit(student, 'number')}
+                          title="Öğrenci numarasını düzeltmek için tıklayınız"
+                        >
+                          {editingCell?.studentId === student.id && editingCell?.field === 'number' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingCell.value}
+                              onChange={e => setEditingCell({ ...editingCell, value: e.target.value })}
+                              onBlur={handleSaveInlineEdit}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleSaveInlineEdit();
+                                if (e.key === 'Escape') setEditingCell(null);
+                              }}
+                              className="w-full bg-white border-2 border-primary rounded px-2 py-0.5 text-xs font-mono font-bold text-on-surface outline-none shadow-xs"
+                              onClick={e => e.stopPropagation()}
+                            />
+                          ) : (
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="group-hover/cell:text-primary transition-colors">{student.number}</span>
+                              <span className="material-symbols-outlined text-[14px] text-primary opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                edit
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Student Name - Inline editable on click/hover */}
+                        <td 
+                          className="px-4 py-2.5 font-bold relative group/cell cursor-pointer hover:bg-primary/5 transition-colors select-none"
+                          onClick={() => !editingCell && handleStartEdit(student, 'name')}
+                          title="Öğrenci adını düzeltmek için tıklayınız"
+                        >
+                          {editingCell?.studentId === student.id && editingCell?.field === 'name' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingCell.value}
+                              onChange={e => setEditingCell({ ...editingCell, value: e.target.value })}
+                              onBlur={handleSaveInlineEdit}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleSaveInlineEdit();
+                                if (e.key === 'Escape') setEditingCell(null);
+                              }}
+                              className="w-full bg-white border-2 border-primary rounded px-2 py-0.5 text-xs font-bold text-on-surface outline-none shadow-xs"
+                              onClick={e => e.stopPropagation()}
+                            />
+                          ) : (
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="group-hover/cell:text-primary transition-colors">{student.name}</span>
+                              <span className="material-symbols-outlined text-[14px] text-primary opacity-0 group-hover/cell:opacity-100 transition-opacity">
+                                edit
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
                          {questions.map(q => {
                            const valKey = `${student.id}_${q.id}`;
                            const currentScore = grades[valKey] !== undefined ? grades[valKey] : '';
@@ -635,13 +752,25 @@ export default function Grades() {
                          })}
                         <td className="px-4 py-3 text-right font-extrabold text-primary">{totalScore(student.id)}</td>
                         <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleDeleteStudent(student.id, student.name)}
-                            className="p-1 hover:bg-error/10 text-error rounded transition-all inline-flex items-center justify-center active:scale-95"
-                            title="Öğrenciyi Bu Dersten Çıkar"
-                          >
-                            <span className="material-symbols-outlined text-lg">delete</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => {
+                                setStudentForm({ number: student.number, name: student.name, email: student.email || '', id: student.id });
+                                setShowAddStudentModal(true);
+                              }}
+                              className="p-1 hover:bg-primary/10 text-primary rounded transition-all inline-flex items-center justify-center active:scale-95"
+                              title="Öğrenci Bilgilerini Düzenle"
+                            >
+                              <span className="material-symbols-outlined text-base">edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStudent(student.id, student.name)}
+                              className="p-1 hover:bg-error/10 text-error rounded transition-all inline-flex items-center justify-center active:scale-95"
+                              title="Öğrenciyi Bu Dersten Çıkar"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -670,7 +799,7 @@ export default function Grades() {
         )}
       </div>
 
-      {/* Add Student Modal */}
+      {/* Add / Edit Student Modal */}
       {showAddStudentModal && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -680,8 +809,12 @@ export default function Grades() {
           <div className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
             <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center bg-slate-50">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-600">person_add</span>
-                <h3 className="font-bold text-slate-800 text-base">Derse Öğrenci Ekle</h3>
+                <span className="material-symbols-outlined text-primary">
+                  {studentForm.id ? 'edit_square' : 'person_add'}
+                </span>
+                <h3 className="font-bold text-slate-800 text-base">
+                  {studentForm.id ? 'Öğrenci Bilgilerini Düzenle' : 'Derse Öğrenci Ekle'}
+                </h3>
               </div>
               <button onClick={() => setShowAddStudentModal(false)} className="text-slate-400 hover:text-slate-600">
                 <span className="material-symbols-outlined">close</span>
@@ -741,9 +874,9 @@ export default function Grades() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-600/20"
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-container active:scale-95 transition-all shadow-md shadow-primary/20"
                 >
-                  Kaydet ve Ekle
+                  {studentForm.id ? 'Güncelle' : 'Kaydet ve Ekle'}
                 </button>
               </div>
             </form>
