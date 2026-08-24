@@ -592,7 +592,10 @@ export default function Exams() {
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pt-4 border-t border-outline-variant">
               {/* Exam Type Filter Pills */}
               <div className="flex flex-wrap gap-1.5 bg-slate-50 p-1 rounded-xl border border-outline-variant">
-                {['Tümü', 'Vize', 'Final', 'Bütünleme', 'Ödev', 'Uygulama'].map(filter => (
+                {[
+                  'Tümü', 'Vize', 'Final', 'Bütünleme', 'Ödev', 'Proje', 'Sunum', 'Uygulama',
+                  ...((activeCourse?.custom_weights || []).map(cw => cw.name).filter(Boolean))
+                ].map(filter => (
                   <button
                     key={filter}
                     onClick={() => setActiveFilter(filter)}
@@ -798,7 +801,12 @@ export default function Exams() {
                   <option value="Final">Final</option>
                   <option value="Bütünleme">Bütünleme</option>
                   <option value="Ödev">Ödev</option>
+                  <option value="Proje">Proje</option>
+                  <option value="Sunum">Sunum</option>
                   <option value="Uygulama">Uygulama</option>
+                  {(activeCourse?.custom_weights || []).map((cw, idx) => (
+                    cw.name ? <option key={`custom-${idx}`} value={cw.name}>{cw.name}</option> : null
+                  ))}
                 </select>
               </div>
 

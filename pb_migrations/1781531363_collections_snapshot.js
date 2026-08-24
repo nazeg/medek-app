@@ -1303,6 +1303,32 @@ migrate((app) => {
         {
           "help": "",
           "hidden": false,
+          "id": "number_pct_proje",
+          "max": 100,
+          "min": 0,
+          "name": "pct_proje",
+          "onlyInt": true,
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "number"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "number_pct_sunum",
+          "max": 100,
+          "min": 0,
+          "name": "pct_sunum",
+          "onlyInt": true,
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "number"
+        },
+        {
+          "help": "",
+          "hidden": false,
           "id": "number_pct_uygulama",
           "max": 100,
           "min": 0,
@@ -1312,6 +1338,17 @@ migrate((app) => {
           "required": false,
           "system": false,
           "type": "number"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json_custom_weights",
+          "maxSize": 0,
+          "name": "custom_weights",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
         },
         {
           "help": "",

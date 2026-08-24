@@ -115,20 +115,26 @@ export default function InstructorReports() {
       'Vize': ['Vize'],
       'Final': ['Final'],
       'Ödev': ['Ödev'],
+      'Proje': ['Proje'],
+      'Sunum': ['Sunum'],
       'Uygulama': ['Uygulama'],
       'Bütünleme': ['Bütünleme'],
       'VizeFinal': ['Vize', 'Final'],
       'ÖdevFinal': ['Ödev', 'Final'],
+      'ProjeFinal': ['Proje', 'Final'],
+      'SunumFinal': ['Sunum', 'Final'],
       'UygulamaFinal': ['Uygulama', 'Final'],
       'VizeÖdevFinal': ['Vize', 'Ödev', 'Final'],
       'VizeUygulamaFinal': ['Vize', 'Uygulama', 'Final'],
-      'VizeÖdevUygulamaFinal': ['Vize', 'Ödev', 'Uygulama', 'Final'],
+      'VizeÖdevUygulamaFinal': ['Vize', 'Ödev', 'Proje', 'Sunum', 'Uygulama', 'Final'],
       'VizeBüt': ['Vize', 'Bütünleme'],
       'ÖdevBüt': ['Ödev', 'Bütünleme'],
+      'ProjeBüt': ['Proje', 'Bütünleme'],
+      'SunumBüt': ['Sunum', 'Bütünleme'],
       'UygulamaBüt': ['Uygulama', 'Bütünleme'],
       'VizeÖdevBüt': ['Vize', 'Ödev', 'Bütünleme'],
       'VizeUygulamaBüt': ['Vize', 'Uygulama', 'Bütünleme'],
-      'VizeÖdevUygulamaBüt': ['Vize', 'Ödev', 'Uygulama', 'Bütünleme']
+      'VizeÖdevUygulamaBüt': ['Vize', 'Ödev', 'Proje', 'Sunum', 'Uygulama', 'Bütünleme']
     };
     return map[mod] || [mod];
   };
@@ -203,10 +209,17 @@ export default function InstructorReports() {
       const pctMap = {
         'Vize': selectedCourse.pct_vize ?? 40,
         'Ödev': selectedCourse.pct_odev ?? 0,
+        'Proje': selectedCourse.pct_proje ?? 0,
+        'Sunum': selectedCourse.pct_sunum ?? 0,
         'Uygulama': selectedCourse.pct_uygulama ?? 0,
         'Final': selectedCourse.pct_final ?? 60,
         'Bütünleme': selectedCourse.pct_but ?? 60
       };
+      if (Array.isArray(selectedCourse.custom_weights)) {
+        selectedCourse.custom_weights.forEach(cw => {
+          if (cw.name) pctMap[cw.name] = cw.percentage ?? 0;
+        });
+      }
 
       const isComboMode = reqExams.length > 1;
 
@@ -568,10 +581,17 @@ export default function InstructorReports() {
           const pctMap = {
             'Vize': course.pct_vize ?? 40,
             'Ödev': course.pct_odev ?? 0,
+            'Proje': course.pct_proje ?? 0,
+            'Sunum': course.pct_sunum ?? 0,
             'Uygulama': course.pct_uygulama ?? 0,
             'Final': course.pct_final ?? 60,
             'Bütünleme': course.pct_but ?? 60
           };
+          if (Array.isArray(course.custom_weights)) {
+            course.custom_weights.forEach(cw => {
+              if (cw.name) pctMap[cw.name] = cw.percentage ?? 0;
+            });
+          }
           const isMulti = useExams.length > 1;
 
           const dcExamSonuc = {};
@@ -855,7 +875,10 @@ export default function InstructorReports() {
                 <div>
                   <h5 className="text-xs font-bold text-on-surface-variant mb-2.5">📊 Tekil Sınav Analizleri</h5>
                   <div className="flex flex-wrap gap-2">
-                    {['Vize', 'Final', 'Ödev', 'Uygulama', 'Bütünleme'].map(mod => (
+                    {[
+                      'Vize', 'Final', 'Ödev', 'Proje', 'Sunum', 'Uygulama', 'Bütünleme',
+                      ...((selectedCourse?.custom_weights || []).map(cw => cw.name).filter(Boolean))
+                    ].map(mod => (
                       <button
                         key={mod}
                         onClick={() => calculateCourseAnalysis(mod)}
