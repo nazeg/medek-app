@@ -224,13 +224,25 @@ export default function Grades() {
       const existing = await pb.collection('students').getFirstListItem(`number = "${num}"`).catch(() => null);
       if (existing) {
         const currentCourses = Array.isArray(existing.courses) ? existing.courses : [];
-        if (!currentCourses.includes(activeCourse.id)) {
-          await pb.collection('students').update(existing.id, {
-            courses: [...currentCourses, activeCourse.id],
-            name: name || existing.name,
-            email: studentForm.email.trim() || existing.email
-          });
+        const isAlreadyInCourse = currentCourses.includes(activeCourse.id) || students.some(s => s.id === existing.id || s.number === num);
+        
+        if (isAlreadyInCourse) {
+          alert(`"${num}" numaralı öğrenci (${existing.name}) zaten bu derse kayıtlıdır!`, 'Mükerrer Öğrenci Uyarısı', 'warning');
+          return;
         }
+
+        // Student exists in system (from another course), link them to this course
+        await pb.collection('students').update(existing.id, {
+          courses: [...currentCourses, activeCourse.id],
+          name: name || existing.name,
+          email: studentForm.email.trim() || existing.email
+        });
+
+        setShowAddStudentModal(false);
+        setStudentForm({ number: '', name: '', email: '', id: null });
+        await loadStudentsForCourse(activeCourse.id);
+        alert(`Sistemde kayıtlı olan "${existing.name}" (${num}) bu derse başarıyla eklendi.`, 'Başarılı', 'success');
+        return;
       } else {
         await pb.collection('students').create({
           number: num,
