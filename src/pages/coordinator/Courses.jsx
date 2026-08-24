@@ -90,8 +90,8 @@ export default function CoordinatorCourses() {
     const but = form.pct_but !== '' && form.pct_but !== null ? (parseInt(form.pct_but) || 0) : 0;
 
     const totalWeights = vize + odev + uyg + final;
-    if (totalWeights > 0 && totalWeights !== 100) {
-      await alert('Değerlendirme ağırlıkları girildiğinde toplamı (Vize + Ödev + Uygulama + Final) 100% olmalıdır. Şu anki toplam: ' + totalWeights + '%\n(Ağırlık belirlemek istemiyorsanız alanları boş bırakabilirsiniz.)', 'Hata', 'error');
+    if (totalWeights !== 100) {
+      await alert(`Sınav değerlendirme ağırlıkları toplamı (Vize + Ödev + Uygulama + Final) 100 olmalıdır. Şu anki toplam: ${totalWeights}`, 'Hata', 'warning');
       return;
     }
 
@@ -646,8 +646,21 @@ export default function CoordinatorCourses() {
 
                 <div className="border border-outline-variant rounded-lg p-3 bg-slate-50/50 space-y-3">
                   <div className="flex items-center justify-between border-b border-outline-variant pb-1">
-                    <span className="text-xs font-bold text-on-surface">Sınav Ağırlıkları (%)</span>
-                    <span className="text-[11px] text-on-surface-variant font-medium">(İsteğe Bağlı)</span>
+                    <span className="text-xs font-bold text-on-surface">
+                      Sınav Ağırlıkları (%) <span className="text-error">*</span>
+                    </span>
+                    {(() => {
+                      const total = (form.pct_vize !== '' ? parseInt(form.pct_vize) || 0 : 0) + 
+                                    (form.pct_odev !== '' ? parseInt(form.pct_odev) || 0 : 0) + 
+                                    (form.pct_uygulama !== '' ? parseInt(form.pct_uygulama) || 0 : 0) + 
+                                    (form.pct_final !== '' ? parseInt(form.pct_final) || 0 : 0);
+                      const isCorrect = total === 100;
+                      return (
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
+                          Toplam: {total} / 100
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div className="grid grid-cols-5 gap-2">
                     <div>
@@ -671,7 +684,7 @@ export default function CoordinatorCourses() {
                       <input type="number" min="0" max="100" placeholder="—" value={form.pct_but ?? ''} onChange={e => setForm({ ...form, pct_but: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center" />
                     </div>
                   </div>
-                  <span className="text-[10px] text-on-surface-variant block">Not: Ağırlık belirlenirse Vize + Ödev + Uygulama + Final toplamı 100 olmalıdır. (Bütünleme, Final yerine geçer.)</span>
+                  <span className="text-[10px] text-on-surface-variant block">Not: Vize + Ödev + Uygulama + Final toplamı 100 olmalıdır. (Bütünleme, Final yerine geçer.)</span>
                 </div>
               </div>
 
