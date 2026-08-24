@@ -286,7 +286,7 @@ export default function InstructorReports() {
           const et = reqExams[0];
           const { alinan, max } = dcExamSonuc[dc.code][et] || { alinan: 0, max: 0 };
           dcAssessed[dc.code] = max > 0;
-          return max > 0 ? ((alinan / max) * 100).toFixed(1) : '0.0';
+          return max > 0 ? ((alinan / max) * 100).toFixed(2) : '0.00';
         } else {
           let weightedSum = 0, usedWeightSum = 0;
           reqExams.forEach(et => {
@@ -298,7 +298,7 @@ export default function InstructorReports() {
             }
           });
           dcAssessed[dc.code] = usedWeightSum > 0;
-          return usedWeightSum > 0 ? (weightedSum / usedWeightSum).toFixed(1) : '0.0';
+          return usedWeightSum > 0 ? (weightedSum / usedWeightSum).toFixed(2) : '0.00';
         }
       });
 
@@ -359,7 +359,7 @@ export default function InstructorReports() {
             toplamIliski += level;
           }
         });
-        return toplamIliski > 0 ? (toplamKatki / toplamIliski).toFixed(1) : '0.0';
+        return toplamIliski > 0 ? (toplamKatki / toplamIliski).toFixed(2) : '0.00';
       });
 
       // Calculate student success per program outcome
@@ -492,9 +492,9 @@ export default function InstructorReports() {
             datalabels: {
               anchor: 'end',
               align: 'top',
-              formatter: val => Math.round(val) + '%',
-              font: { weight: 'bold', size: 10 },
-              color: '#0b1c30'
+              formatter: val => '%' + (Number(val) || 0).toFixed(2).replace('.', ','),
+              font: { weight: 'bold', size: 12 },
+              color: '#0058be'
             }
           },
           scales: {
@@ -524,9 +524,9 @@ export default function InstructorReports() {
           plugins: {
             legend: { display: false },
             datalabels: {
-              formatter: val => Math.round(val) + '%',
-              font: { weight: 'bold', size: 9 },
-              color: '#0b1c30'
+              formatter: val => '%' + (Number(val) || 0).toFixed(2).replace('.', ','),
+              font: { weight: 'bold', size: 11 },
+              color: '#006c49'
             }
           },
           scales: {
@@ -987,28 +987,120 @@ export default function InstructorReports() {
 
               {/* PDF PRINT AREA CONTAINER */}
               <div ref={printCourseRef} className="space-y-6 bg-white p-6 rounded-xl border border-outline-variant">
-                {/* PDF Header (Only visible on prints/pdf) */}
-                <div className="text-center pb-4 mb-6 border-b-2 border-outline-variant">
-                  <h2 className="text-headline-lg font-bold text-[#0058be]">{selectedCourse.expand?.program?.name || 'Program Belirtilmedi'}</h2>
-                  <h3 className="text-headline-md font-semibold text-on-surface mt-1">{selectedCourse.code} - {selectedCourse.name} {selectedCourse.sube ? `(Şube: ${selectedCourse.sube})` : ''}</h3>
-                  <h4 className="text-sm font-bold text-[#006c49] mt-1">Sınav Analiz Modülü: {analizData.modName}</h4>
+                {/* PDF & Screen Header */}
+                <div className="text-center pb-5 mb-6 border-b-2 border-outline-variant space-y-2">
+                  <h2 className="text-2xl font-black text-[#0058be] tracking-tight">
+                    {selectedCourse.expand?.program?.name || 'Program Belirtilmedi'}
+                  </h2>
+                  
+                  {/* Dönem Bilgisi */}
+                  <div className="flex justify-center">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-slate-100/80 text-slate-700 rounded-full border border-slate-200 text-xs font-bold shadow-2xs">
+                      <span className="material-symbols-outlined text-[15px] text-slate-500">calendar_month</span>
+                      {activeTerm?.name || 'Dönem Belirtilmedi'}
+                    </span>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-slate-800 mt-1">
+                    {selectedCourse.code} - {selectedCourse.name} {selectedCourse.sube ? `(Şube: ${selectedCourse.sube})` : ''}
+                  </h3>
+
+                  {/* Öğretim Elemanı, Öğrenci Sayısı ve Sınav Modülü Rozetleri */}
+                  <div className="flex flex-wrap justify-center items-center gap-2.5 pt-1.5 text-xs font-semibold text-slate-600">
+                    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 border border-blue-200/80 px-3 py-1 rounded-lg shadow-2xs">
+                      <span className="material-symbols-outlined text-[15px]">person</span>
+                      <strong>Öğretim Elemanı:</strong>{' '}
+                      {(() => {
+                        const instructors = selectedCourse.expand?.instructor;
+                        if (Array.isArray(instructors) && instructors.length > 0) {
+                          return instructors.map(inst => inst.title ? `${inst.title} ${inst.name}` : inst.name).join(', ');
+                        } else if (instructors?.name) {
+                          return instructors.title ? `${instructors.title} ${instructors.name}` : instructors.name;
+                        } else if (user?.name) {
+                          return user.title ? `${user.title} ${user.name}` : user.name;
+                        }
+                        return 'Tanımlanmadı';
+                      })()}
+                    </span>
+
+                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1 rounded-lg shadow-2xs">
+                      <span className="material-symbols-outlined text-[15px]">group</span>
+                      <strong>Öğrenci Sayısı:</strong> {analizData.students?.length || 0} Kişi
+                    </span>
+
+                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-3 py-1 rounded-lg shadow-2xs">
+                      <span className="material-symbols-outlined text-[15px]">analytics</span>
+                      <strong>Sınav Modülü:</strong> {analizData.modName}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Charts Area */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                    <h4 className="text-sm font-bold text-on-surface mb-3">Ders Çıktısı (DÇ) Başarı %</h4>
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-bold text-on-surface">Ders Çıktısı (DÇ) Başarı %</h4>
+                      <span className="text-[11px] font-semibold text-slate-400">2 Basamaklı Hassasiyet</span>
+                    </div>
                     <div className="relative h-[300px]">
                       <canvas id="chartDC"></canvas>
                     </div>
                   </div>
                   <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                    <h4 className="text-sm font-bold text-on-surface mb-3">Program Çıktısı (PÇ) Sağlanma %</h4>
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-bold text-on-surface">Program Çıktısı (PÇ) Sağlanma %</h4>
+                      <span className="text-[11px] font-semibold text-slate-400">PÇ-DÇ Ağırlıklı Dağılım</span>
+                    </div>
                     <div className="relative h-[300px]">
                       <canvas id="chartPC"></canvas>
                     </div>
                   </div>
                 </div>
+
+                {/* DÇ Başarı Yüzdeleri Özet Kartları (Büyük Küsüratlı Rakamlar) */}
+                {analizData.dcs.length > 0 && (
+                  <div className="border border-outline-variant rounded-xl p-5 bg-white space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-[#0058be] flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-base">percent</span>
+                        Ders Çıktısı (DÇ) Başarı Yüzdeleri
+                      </h4>
+                      <span className="text-[11px] font-medium text-slate-500">
+                        {analizData.modName} değerlendirmesi
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
+                      {analizData.dcs.map((dc, i) => {
+                        const pct = parseFloat(analizData.dcSuccessData[i]) || 0;
+                        const pctFormatted = pct.toFixed(2).replace('.', ',');
+                        return (
+                          <div 
+                            key={dc.id} 
+                            className="p-3 rounded-xl border border-outline-variant/80 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col justify-between shadow-2xs group"
+                          >
+                            <div className="flex items-center justify-between gap-1 mb-2">
+                              <span className="font-bold text-xs text-primary px-2 py-0.5 rounded bg-primary/10 border border-primary/20">
+                                {dc.code}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getBadgeColorByValue(pct)}`}>
+                                {pct >= 70 ? 'Başarılı' : pct >= 50 ? 'Orta' : 'Düşük'}
+                              </span>
+                            </div>
+                            <div className="my-1 text-center sm:text-left">
+                              <span className="text-2xl font-black text-slate-800 tracking-tight block">
+                                %{pctFormatted}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-1" title={dc.description}>
+                              {dc.description || 'DÇ Tanımı'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Outcome matrix details */}
                 {analizData.pcs.length > 0 && analizData.dcs.length > 0 && (
@@ -1124,16 +1216,16 @@ export default function InstructorReports() {
                             {analizData.dcs.map(dc => {
                               const pct = analizData.studentDcSuccess[o.id]?.[dc.code] || 0;
                               return (
-                                <td key={dc.id} className={`px-2 py-2 text-center font-bold ${getColorByValue(pct)}`}>
-                                  {pct.toFixed(1)}%
+                                <td key={dc.id} className={`px-2 py-2 text-center font-bold text-xs ${getColorByValue(pct)}`}>
+                                  %{pct.toFixed(2).replace('.', ',')}
                                 </td>
                               );
                             })}
                             {analizData.pcs.map(pc => {
                               const pct = analizData.studentPcSuccess[o.id]?.[pc.code] || 0;
                               return (
-                                <td key={pc.id} className="px-2 py-2 text-center font-bold bg-[#f1f8e9] text-on-surface">
-                                  {pct.toFixed(1)}%
+                                <td key={pc.id} className="px-2 py-2 text-center font-bold text-xs bg-[#f1f8e9] text-on-surface">
+                                  %{pct.toFixed(2).replace('.', ',')}
                                 </td>
                               );
                             })}
