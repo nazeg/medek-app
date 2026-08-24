@@ -1,14 +1,23 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import pb from '../lib/pocketbase';
+import { useAuth } from './AuthContext';
 
 const TermContext = createContext(null);
 
 export function TermProvider({ children }) {
+  const { user } = useAuth();
   const [terms, setTerms] = useState([]);
   const [activeTerm, setActiveTerm] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadTerms = useCallback(async () => {
+    if (!user) {
+      setTerms([]);
+      setActiveTerm(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const list = await pb.collection('terms').getFullList({ sort: '-name' });
       setTerms(list);
@@ -28,13 +37,15 @@ export function TermProvider({ children }) {
       if (list.length > 0) {
         setActiveTerm(list[0]);
         localStorage.setItem('medek_active_term_id', list[0].id);
+      } else {
+        setActiveTerm(null);
       }
     } catch (err) {
       console.error('Error loading terms:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadTerms();
@@ -45,6 +56,9 @@ export function TermProvider({ children }) {
     if (found) {
       setActiveTerm(found);
       localStorage.setItem('medek_active_term_id', termId);
+    } else if (termId === '') {
+      setActiveTerm(null);
+      localStorage.removeItem('medek_active_term_id');
     }
   }, [terms]);
 
