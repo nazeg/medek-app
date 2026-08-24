@@ -32,6 +32,7 @@ export default function InstructorReports() {
   // Tab 1 State (Detaylı Analiz)
   const [analizData, setAnalizData] = useState(null);
   const [pcChartType, setPcChartType] = useState('bar'); // 'bar' (Sütun) | 'radar' (Radar)
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   // Tab 2 State (Program PÇ Raporu)
   const [cohortMatrix, setCohortMatrix] = useState({});
@@ -875,18 +876,29 @@ export default function InstructorReports() {
   }, [programReportData]);
 
   // PDF Export course report
-  const exportCourseReportPDF = () => {
+  const exportCourseReportPDF = async () => {
     if (!printCourseRef.current || !selectedCourse) return;
-    const filename = `${selectedCourse.code}_${analizData.modName}_Analiz_Raporu.pdf`;
-    const opt = {
-      margin: [0.4, 0.4, 0.4, 0.4],
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape', compress: true },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['.card', 'tr'] }
-    };
-    html2pdf().set(opt).from(printCourseRef.current).save();
+    setIsExportingPDF(true);
+    // Allow state change to trigger full table height rendering
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    try {
+      const filename = `${selectedCourse.code}_${analizData.modName}_Analiz_Raporu.pdf`;
+      const opt = {
+        margin: [0.3, 0.3, 0.3, 0.3],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape', compress: true },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.card', 'tr'] }
+      };
+      await html2pdf().set(opt).from(printCourseRef.current).save();
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('PDF oluşturulurken bir hata oluştu: ' + err.message, 'Hata', 'error');
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   // PDF Export program report
@@ -1046,10 +1058,13 @@ export default function InstructorReports() {
               <div className="flex justify-end">
                 <button
                   onClick={exportCourseReportPDF}
-                  className="px-4 py-2 bg-[#ba1a1a] hover:bg-[#ba1a1a]/90 text-white rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-md shadow-red-500/10 transition-all"
+                  disabled={isExportingPDF}
+                  className="px-4 py-2 bg-[#ba1a1a] hover:bg-[#ba1a1a]/90 disabled:opacity-60 text-white rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-md shadow-red-500/10 transition-all active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-base">file_open</span>
-                  PDF Raporunu İndir
+                  <span className="material-symbols-outlined text-base">
+                    {isExportingPDF ? 'hourglass_top' : 'file_open'}
+                  </span>
+                  {isExportingPDF ? 'PDF Hazırlanıyor...' : 'PDF Raporunu İndir'}
                 </button>
               </div>
 
@@ -1236,9 +1251,9 @@ export default function InstructorReports() {
                 {/* Outcome Success Aggregates for all students */}
                 <div className="border border-outline-variant rounded-xl p-5 bg-white">
                   <h4 className="text-sm font-bold text-on-surface mb-3">🎓 Öğrenci Kazanım Özeti ({analizData.modName})</h4>
-                  <div className="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar">
+                  <div className={`overflow-x-auto ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[350px] overflow-y-auto custom-scrollbar'}`}>
                     <table className="w-full text-left border-collapse text-xs">
-                      <thead className="sticky top-0 bg-white z-10 shadow-sm border-b border-outline-variant">
+                      <thead className={`bg-white z-10 border-b border-outline-variant ${isExportingPDF ? '' : 'sticky top-0 shadow-sm'}`}>
                         <tr>
                           <th className="px-3 py-2 font-bold text-on-surface">Öğrenci</th>
                           {analizData.dcs.map(dc => (
@@ -1285,9 +1300,9 @@ export default function InstructorReports() {
                   
                   {analizData.isComboMode ? (
                     /* KOMBİNASYON TABLOSU (Sınav ağırlıklı) */
-                    <div className="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar">
+                    <div className={`overflow-x-auto ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[350px] overflow-y-auto custom-scrollbar'}`}>
                       <table className="w-full text-left border-collapse text-xs">
-                        <thead className="sticky top-0 bg-white z-10 shadow-sm border-b border-outline-variant">
+                        <thead className={`bg-white z-10 border-b border-outline-variant ${isExportingPDF ? '' : 'sticky top-0 shadow-sm'}`}>
                           <tr>
                             <th className="px-3 py-2 font-bold text-on-surface">No</th>
                             <th className="px-3 py-2 font-bold text-on-surface">Ad Soyad</th>
@@ -1355,7 +1370,7 @@ export default function InstructorReports() {
                             return (
                               <>
                                 {rows}
-                                <tr className="bg-slate-100 font-bold border-t border-outline-variant sticky bottom-0">
+                                <tr className={`bg-slate-100 font-bold border-t border-outline-variant ${isExportingPDF ? '' : 'sticky bottom-0'}`}>
                                   <td colSpan={2} className="px-3 py-2.5 text-right">Sınıf Ortalaması:</td>
                                   {analizData.reqExams.map(et => {
                                     const avgRaw = termSums[et].count > 0 ? termSums[et].sum / termSums[et].count : 0;
@@ -1379,9 +1394,9 @@ export default function InstructorReports() {
                     </div>
                   ) : (
                     /* TEKİL SINAV TABLOSU (Soru bazlı detay) */
-                    <div className="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar">
+                    <div className={`overflow-x-auto ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[350px] overflow-y-auto custom-scrollbar'}`}>
                       <table className="w-full text-left border-collapse text-xs">
-                        <thead className="sticky top-0 bg-white z-10 shadow-sm border-b border-outline-variant">
+                        <thead className={`bg-white z-10 border-b border-outline-variant ${isExportingPDF ? '' : 'sticky top-0 shadow-sm'}`}>
                           <tr>
                             <th className="px-3 py-2 font-bold text-on-surface">No</th>
                             <th className="px-3 py-2 font-bold text-on-surface">Ad Soyad</th>
@@ -1473,7 +1488,7 @@ export default function InstructorReports() {
                             return (
                               <>
                                 {rows}
-                                <tr className="bg-slate-100 font-bold border-t border-outline-variant sticky bottom-0">
+                                <tr className={`bg-slate-100 font-bold border-t border-outline-variant ${isExportingPDF ? '' : 'sticky bottom-0'}`}>
                                   <td colSpan={2} className="px-3 py-2.5 text-right">Sınıf Ortalaması:</td>
                                   {analizData.questions.map(q => {
                                     const avgQ = questionSums[q.id].count > 0 ? questionSums[q.id].sum / questionSums[q.id].count : 0;
