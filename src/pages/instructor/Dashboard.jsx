@@ -58,23 +58,43 @@ export default function InstructorDashboard() {
         if (filteredCourses.length > 0) {
           const courseIdsFilter = filteredCourses.map(c => `course = "${c.id}"`).join(' || ');
           
-          const [dcsList, examsList] = await Promise.all([
+          const [dcsList, examsList, allStudentsList] = await Promise.all([
             pb.collection('course_outcomes').getFullList({
               filter: courseIdsFilter,
             }),
             pb.collection('exams').getFullList({
               filter: courseIdsFilter,
-            })
+            }),
+            pb.collection('students').getFullList({
+              sort: 'number'
+            }).catch(() => [])
           ]);
 
           dcsCount = dcsList.length;
           examsCount = examsList.length;
 
+          // Fetch student grades to calculate per-course student counts
+          let studentGradesList = [];
+          if (examsList.length > 0) {
+            const examIdsFilter = examsList.map(e => `exam = "${e.id}"`).join(' || ');
+            studentGradesList = await pb.collection('student_grades').getFullList({
+              filter: examIdsFilter
+            }).catch(() => []);
+          }
+
           // Map stats to each course
           filteredCourses.forEach(c => {
             const courseDcs = dcsList.filter(d => d.course === c.id);
+            const courseExams = examsList.filter(e => e.course === c.id);
+            const courseExamIds = new Set(courseExams.map(e => e.id));
+            const distinctStudents = new Set(studentGradesList.filter(g => courseExamIds.has(g.exam)).map(g => g.student));
+            
+            // Count graded students or total system students
+            const count = distinctStudents.size > 0 ? distinctStudents.size : allStudentsList.length;
+
             courseStats[c.id] = {
-              dcs: courseDcs.length
+              dcs: courseDcs.length,
+              studentsCount: count
             };
           });
         }
@@ -90,7 +110,8 @@ export default function InstructorDashboard() {
 
         setCoursesWithStats(filteredCourses.map(c => ({
           ...c,
-          dcsCount: courseStats[c.id]?.dcs || 0
+          dcsCount: courseStats[c.id]?.dcs || 0,
+          studentsCount: courseStats[c.id]?.studentsCount || 0
         })));
 
       } catch (err) {
@@ -239,8 +260,12 @@ export default function InstructorDashboard() {
                         </div>
                       </div>
 
-                      {/* Course Badges: Credits, ECTS, Class, Branch */}
+                      {/* Course Badges: Credits, ECTS, Class, Branch, Student Count */}
                       <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200/80 shadow-2xs flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">group</span>
+                          {course.studentsCount || 0} Öğrenci
+                        </span>
                         {course.credits !== undefined && course.credits !== '' && (
                           <span className="text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200/80 shadow-2xs">
                             {course.credits} Kredi
@@ -266,11 +291,19 @@ export default function InstructorDashboard() {
 
                     <div className="p-5 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-on-surface-variant border-b border-slate-100 pb-4">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-[#7C3AED] text-lg shrink-0">description</span>
-                          <span>
-                            Ders Çıktısı (DÇ): <strong className="text-on-surface font-semibold">{course.dcsCount} adet</strong>
-                          </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[#7C3AED] text-lg shrink-0">description</span>
+                            <span>
+                              Ders Çıktısı (DÇ): <strong className="text-on-surface font-semibold">{course.dcsCount} adet</strong>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[#059669] text-lg shrink-0">group</span>
+                            <span>
+                              Kayıtlı Öğrenci: <strong className="text-on-surface font-semibold">{course.studentsCount || 0} kişi</strong>
+                            </span>
+                          </div>
                         </div>
                         
                         {/* Assessment Weights */}
