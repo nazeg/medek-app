@@ -55,11 +55,17 @@ export default function InstructorReports() {
       return;
     }
 
-    let filter = `term = "${activeTerm.id}"`;
-    if (!isInstructorView && activeProgram) {
-      filter += ` && program = "${activeProgram.id}"`;
+    let filter = '';
+    if (user.role === 'instructor') {
+      filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}") && term = "${activeTerm.id}"`;
+    } else if (user.role === 'coordinator' || user.role === 'program_head') {
+      if (activeProgram?.id) {
+        filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}" || program = "${activeProgram.id}") && term = "${activeTerm.id}"`;
+      } else {
+        filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}") && term = "${activeTerm.id}"`;
+      }
     } else {
-      filter += ` && instructor ~ "${user.id}"`;
+      filter = activeProgram ? `program = "${activeProgram.id}" && term = "${activeTerm.id}"` : `term = "${activeTerm.id}"`;
     }
 
     pb.collection('courses').getFullList({

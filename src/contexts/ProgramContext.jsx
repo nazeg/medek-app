@@ -25,9 +25,12 @@ export function ProgramProvider({ children }) {
           sort: 'name',
           filter: `head = "${user.id}"`
         });
+        if (list.length === 0) {
+          list = await pb.collection('programs').getFullList({ sort: 'name' });
+        }
       } else if (user.role === 'instructor') {
         const coursesList = await pb.collection('courses').getFullList({
-          filter: `instructor ~ "${user.id}"`,
+          filter: `instructor ~ "${user.id}" || instructor ?= "${user.id}"`,
           expand: 'program',
           requestKey: null
         });
@@ -38,11 +41,10 @@ export function ProgramProvider({ children }) {
           }
         });
         list = Object.values(programMap).sort((a, b) => a.name.localeCompare(b.name));
+      } else if (user.role === 'admin') {
+        list = await pb.collection('programs').getFullList({ sort: 'name' });
       } else {
-        setPrograms([]);
-        setActiveProgram(null);
-        setLoading(false);
-        return;
+        list = await pb.collection('programs').getFullList({ sort: 'name' });
       }
       setPrograms(list);
       
