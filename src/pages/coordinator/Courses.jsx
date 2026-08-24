@@ -17,8 +17,7 @@ export default function CoordinatorCourses() {
   const [terms, setTerms] = useState([]);
   const [faculties, setFaculties] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState({ code: '', name: '', sube: '', credits: '3', akts: '5', program: '', instructor: [], term: '', sinif: '1', pct_vize: 40, pct_odev: 0, pct_uygulama: 0, pct_final: 60, pct_but: 60 });
+  const [form, setForm] = useState({ code: '', name: '', sube: '', credits: '', akts: '', program: '', instructor: [], term: '', sinif: '1', pct_vize: '', pct_odev: '', pct_uygulama: '', pct_final: '', pct_but: '' });
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [instructorSearch, setInstructorSearch] = useState('');
@@ -83,9 +82,15 @@ export default function CoordinatorCourses() {
       return;
     }
 
-    const totalWeights = (parseInt(form.pct_vize) || 0) + (parseInt(form.pct_odev) || 0) + (parseInt(form.pct_uygulama) || 0) + (parseInt(form.pct_final) || 0);
-    if (totalWeights !== 100) {
-      await alert('Değerlendirme ağırlıkları toplamı (Vize + Ödev + Uygulama + Final) 100% olmalıdır. Şu anki toplam: ' + totalWeights + '%', 'Hata', 'error');
+    const vize = form.pct_vize !== '' && form.pct_vize !== null ? (parseInt(form.pct_vize) || 0) : 0;
+    const odev = form.pct_odev !== '' && form.pct_odev !== null ? (parseInt(form.pct_odev) || 0) : 0;
+    const uyg = form.pct_uygulama !== '' && form.pct_uygulama !== null ? (parseInt(form.pct_uygulama) || 0) : 0;
+    const final = form.pct_final !== '' && form.pct_final !== null ? (parseInt(form.pct_final) || 0) : 0;
+    const but = form.pct_but !== '' && form.pct_but !== null ? (parseInt(form.pct_but) || 0) : 0;
+
+    const totalWeights = vize + odev + uyg + final;
+    if (totalWeights > 0 && totalWeights !== 100) {
+      await alert('Değerlendirme ağırlıkları girildiğinde toplamı (Vize + Ödev + Uygulama + Final) 100% olmalıdır. Şu anki toplam: ' + totalWeights + '%\n(Ağırlık belirlemek istemiyorsanız alanları boş bırakabilirsiniz.)', 'Hata', 'error');
       return;
     }
 
@@ -115,11 +120,11 @@ export default function CoordinatorCourses() {
         program: activeProgram.id,
         term: activeTerm.id,
         instructor: Array.isArray(form.instructor) ? form.instructor : [],
-        pct_vize: parseInt(form.pct_vize) || 0,
-        pct_odev: parseInt(form.pct_odev) || 0,
-        pct_uygulama: parseInt(form.pct_uygulama) || 0,
-        pct_final: parseInt(form.pct_final) || 0,
-        pct_but: parseInt(form.pct_but) || 0
+        pct_vize: vize,
+        pct_odev: odev,
+        pct_uygulama: uyg,
+        pct_final: final,
+        pct_but: but
       };
 
       if (editItem) {
@@ -129,7 +134,7 @@ export default function CoordinatorCourses() {
       }
       setShowModal(false);
       setEditItem(null);
-      setForm({ code: '', name: '', sube: '', credits: '3', akts: '5', program: '', instructor: [], term: activeTerm.id, sinif: '1', pct_vize: 40, pct_odev: 0, pct_uygulama: 0, pct_final: 60, pct_but: 60 });
+      setForm({ code: '', name: '', sube: '', credits: '', akts: '', program: '', instructor: [], term: activeTerm.id, sinif: '1', pct_vize: '', pct_odev: '', pct_uygulama: '', pct_final: '', pct_but: '' });
       setInstructorSearch('');
       load();
     } catch (err) {
@@ -149,20 +154,20 @@ export default function CoordinatorCourses() {
     setEditItem(item);
     setInstructorSearch('');
     setForm({ 
-      code: item.code, 
-      name: item.name, 
+      code: item.code || '', 
+      name: item.name || '', 
       sube: item.sube || '',
-      credits: item.credits, 
-      akts: item.akts, 
-      program: item.program, 
+      credits: item.credits ?? '', 
+      akts: item.akts ?? '', 
+      program: item.program || '', 
       instructor: Array.isArray(item.instructor) ? item.instructor : (item.instructor ? [item.instructor] : []), 
       term: item.term || activeTerm?.id || '', 
-      sinif: item.sinif,
-      pct_vize: item.pct_vize ?? 40,
-      pct_odev: item.pct_odev ?? 0,
-      pct_uygulama: item.pct_uygulama ?? 0,
-      pct_final: item.pct_final ?? 60,
-      pct_but: item.pct_but ?? 60
+      sinif: item.sinif || '1',
+      pct_vize: item.pct_vize !== undefined && item.pct_vize !== null ? item.pct_vize : '',
+      pct_odev: item.pct_odev !== undefined && item.pct_odev !== null ? item.pct_odev : '',
+      pct_uygulama: item.pct_uygulama !== undefined && item.pct_uygulama !== null ? item.pct_uygulama : '',
+      pct_final: item.pct_final !== undefined && item.pct_final !== null ? item.pct_final : '',
+      pct_but: item.pct_but !== undefined && item.pct_but !== null ? item.pct_but : ''
     });
     setShowModal(true);
   };
@@ -488,7 +493,7 @@ export default function CoordinatorCourses() {
             <button onClick={() => fileInputRef.current?.click()} disabled={importing} className="px-3 py-2 border border-outline-variant rounded-lg text-sm text-on-surface hover:bg-surface flex items-center gap-2 active:scale-95 disabled:opacity-50">
               <span className="material-symbols-outlined text-lg">upload</span> {importing ? 'Yükleniyor...' : "Excel'den Aktar"}
             </button>
-            <button onClick={() => { setEditItem(null); setInstructorSearch(''); setForm({ code: '', name: '', sube: '', credits: '3', akts: '5', program: '', instructor: [], term: activeTerm?.id || '', sinif: '1', pct_vize: 40, pct_odev: 0, pct_uygulama: 0, pct_final: 60, pct_but: 60 }); setShowModal(true); }} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-md shadow-primary/20 hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95">
+            <button onClick={() => { setEditItem(null); setInstructorSearch(''); setForm({ code: '', name: '', sube: '', credits: '', akts: '', program: '', instructor: [], term: activeTerm?.id || '', sinif: '1', pct_vize: '', pct_odev: '', pct_uygulama: '', pct_final: '', pct_but: '' }); setShowModal(true); }} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-md shadow-primary/20 hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95">
               <span className="material-symbols-outlined text-lg">add</span> Ders Ekle
             </button>
           </div>
@@ -601,13 +606,13 @@ export default function CoordinatorCourses() {
                     <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">
                       Kredi <span className="text-error">*</span>
                     </label>
-                    <input type="number" min="0" value={form.credits} onChange={e => setForm({ ...form, credits: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
+                    <input type="number" min="0" value={form.credits} onChange={e => setForm({ ...form, credits: e.target.value })} placeholder="Örn: 3" className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
                   </div>
                   <div>
                     <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">
                       AKTS <span className="text-error">*</span>
                     </label>
-                    <input type="number" min="0" value={form.akts} onChange={e => setForm({ ...form, akts: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
+                    <input type="number" min="0" value={form.akts} onChange={e => setForm({ ...form, akts: e.target.value })} placeholder="Örn: 5" className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
                   </div>
                   <div>
                     <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">Sınıf</label>
@@ -639,30 +644,33 @@ export default function CoordinatorCourses() {
                 </div>
 
                 <div className="border border-outline-variant rounded-lg p-3 bg-slate-50/50 space-y-3">
-                  <span className="text-xs font-bold text-on-surface block border-b border-outline-variant pb-1">Sınav Ağırlıkları (%)</span>
+                  <div className="flex items-center justify-between border-b border-outline-variant pb-1">
+                    <span className="text-xs font-bold text-on-surface">Sınav Ağırlıkları (%)</span>
+                    <span className="text-[11px] text-on-surface-variant font-medium">(İsteğe Bağlı)</span>
+                  </div>
                   <div className="grid grid-cols-5 gap-2">
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-semibold">Vize</label>
-                      <input type="number" min="0" max="100" value={form.pct_vize} onChange={e => setForm({ ...form, pct_vize: parseInt(e.target.value) || 0 })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary" />
+                      <input type="number" min="0" max="100" placeholder="—" value={form.pct_vize ?? ''} onChange={e => setForm({ ...form, pct_vize: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center" />
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-semibold">Ödev</label>
-                      <input type="number" min="0" max="100" value={form.pct_odev} onChange={e => setForm({ ...form, pct_odev: parseInt(e.target.value) || 0 })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary" />
+                      <input type="number" min="0" max="100" placeholder="—" value={form.pct_odev ?? ''} onChange={e => setForm({ ...form, pct_odev: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center" />
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-semibold">Uyg.</label>
-                      <input type="number" min="0" max="100" value={form.pct_uygulama} onChange={e => setForm({ ...form, pct_uygulama: parseInt(e.target.value) || 0 })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary" />
+                      <input type="number" min="0" max="100" placeholder="—" value={form.pct_uygulama ?? ''} onChange={e => setForm({ ...form, pct_uygulama: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center" />
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-semibold">Final</label>
-                      <input type="number" min="0" max="100" value={form.pct_final} onChange={e => setForm({ ...form, pct_final: parseInt(e.target.value) || 0 })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary" />
+                      <input type="number" min="0" max="100" placeholder="—" value={form.pct_final ?? ''} onChange={e => setForm({ ...form, pct_final: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center" />
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-semibold">Büt</label>
-                      <input type="number" min="0" max="100" value={form.pct_but} onChange={e => setForm({ ...form, pct_but: parseInt(e.target.value) || 0 })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary" />
+                      <input type="number" min="0" max="100" placeholder="—" value={form.pct_but ?? ''} onChange={e => setForm({ ...form, pct_but: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1.5 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center" />
                     </div>
                   </div>
-                  <span className="text-[10px] text-on-surface-variant block">Not: Vize + Ödev + Uygulama + Final toplamı 100 olmalıdır. (Bütünleme, Final yerine geçer.)</span>
+                  <span className="text-[10px] text-on-surface-variant block">Not: Ağırlık belirlenirse Vize + Ödev + Uygulama + Final toplamı 100 olmalıdır. (Bütünleme, Final yerine geçer.)</span>
                 </div>
               </div>
 
