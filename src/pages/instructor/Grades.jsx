@@ -54,6 +54,15 @@ export default function Grades() {
     }
 
     try {
+      if (field === 'number') {
+        const conflict = await pb.collection('students').getFirstListItem(`number = "${trimmed}" && id != "${studentId}"`).catch(() => null);
+        if (conflict) {
+          alert(`"${trimmed}" numaralı öğrenci (${conflict.name}) sistemde zaten kayıtlı! Aynı numara birden fazla öğrenciye verilemez.`, 'Mükerrer Numara Uyarısı', 'warning');
+          setEditingCell(null);
+          return;
+        }
+      }
+
       await pb.collection('students').update(studentId, {
         [field]: trimmed
       });
@@ -194,6 +203,12 @@ export default function Grades() {
 
     try {
       if (studentForm.id) {
+        const conflict = await pb.collection('students').getFirstListItem(`number = "${num}" && id != "${studentForm.id}"`).catch(() => null);
+        if (conflict) {
+          alert(`"${num}" numaralı öğrenci (${conflict.name}) sistemde zaten kayıtlı! Aynı numara başka bir öğrenciye verilemez.`, 'Mükerrer Numara Uyarısı', 'warning');
+          return;
+        }
+
         await pb.collection('students').update(studentForm.id, {
           number: num,
           name: name,
