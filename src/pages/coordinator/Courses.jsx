@@ -57,7 +57,31 @@ export default function CoordinatorCourses() {
   }, [coordinatorUser, activeTerm, activeProgram]);
 
   const handleSave = async () => {
-    if (!activeProgram) return;
+    if (!activeProgram) {
+      await alert('Lütfen işlem yapmadan önce sağ üst menüden bir program seçiniz.', 'Hata', 'warning');
+      return;
+    }
+    if (!activeTerm) {
+      await alert('Lütfen işlem yapmadan önce sağ üst menüden bir dönem seçiniz.', 'Hata', 'warning');
+      return;
+    }
+
+    if (!form.code || !form.code.trim()) {
+      await alert('Ders Kodu alanı zorunludur.', 'Hata', 'warning');
+      return;
+    }
+    if (!form.name || !form.name.trim()) {
+      await alert('Ders Adı alanı zorunludur.', 'Hata', 'warning');
+      return;
+    }
+    if (form.credits === undefined || form.credits === null || form.credits.toString().trim() === '') {
+      await alert('Kredi alanı zorunludur.', 'Hata', 'warning');
+      return;
+    }
+    if (form.akts === undefined || form.akts === null || form.akts.toString().trim() === '') {
+      await alert('AKTS alanı zorunludur.', 'Hata', 'warning');
+      return;
+    }
 
     const totalWeights = (parseInt(form.pct_vize) || 0) + (parseInt(form.pct_odev) || 0) + (parseInt(form.pct_uygulama) || 0) + (parseInt(form.pct_final) || 0);
     if (totalWeights !== 100) {
@@ -67,13 +91,13 @@ export default function CoordinatorCourses() {
 
     try {
       const trimmedCode = form.code.trim();
-      const trimmedSube = form.sube.trim();
+      const trimmedSube = (form.sube || '').trim();
       const filter = editItem 
-        ? `code = "${trimmedCode}" && sube = "${trimmedSube}" && id != "${editItem.id}"`
-        : `code = "${trimmedCode}" && sube = "${trimmedSube}"`;
+        ? `code = "${trimmedCode}" && sube = "${trimmedSube}" && program = "${activeProgram.id}" && term = "${activeTerm.id}" && id != "${editItem.id}"`
+        : `code = "${trimmedCode}" && sube = "${trimmedSube}" && program = "${activeProgram.id}" && term = "${activeTerm.id}"`;
       const existing = await pb.collection('courses').getList(1, 1, { filter });
       if (existing.items.length > 0) {
-        await alert(`Bu ders kodu ve şube kombinasyonu (${trimmedCode} - ${trimmedSube || 'Varsayılan'}) zaten kullanımda.`, 'Hata', 'error');
+        await alert(`Bu ders kodu ve şube kombinasyonu (${trimmedCode} - ${trimmedSube || 'Varsayılan'}) bu dönemde zaten kullanımda.`, 'Hata', 'error');
         return;
       }
     } catch (err) {
@@ -81,7 +105,23 @@ export default function CoordinatorCourses() {
     }
 
     try {
-      const saveData = { ...form, program: activeProgram.id, term: activeTerm?.id || '' };
+      const saveData = {
+        code: form.code.trim(),
+        name: form.name.trim(),
+        sube: (form.sube || '').trim(),
+        credits: form.credits.toString().trim(),
+        akts: form.akts.toString().trim(),
+        sinif: form.sinif || '1',
+        program: activeProgram.id,
+        term: activeTerm.id,
+        instructor: Array.isArray(form.instructor) ? form.instructor : [],
+        pct_vize: parseInt(form.pct_vize) || 0,
+        pct_odev: parseInt(form.pct_odev) || 0,
+        pct_uygulama: parseInt(form.pct_uygulama) || 0,
+        pct_final: parseInt(form.pct_final) || 0,
+        pct_but: parseInt(form.pct_but) || 0
+      };
+
       if (editItem) {
         await pb.collection('courses').update(editItem.id, saveData);
       } else {
@@ -89,12 +129,19 @@ export default function CoordinatorCourses() {
       }
       setShowModal(false);
       setEditItem(null);
-      setForm({ code: '', name: '', sube: '', credits: '3', akts: '5', program: '', instructor: [], term: activeTerm?.id || '', sinif: '1', pct_vize: 40, pct_odev: 0, pct_uygulama: 0, pct_final: 60, pct_but: 60 });
+      setForm({ code: '', name: '', sube: '', credits: '3', akts: '5', program: '', instructor: [], term: activeTerm.id, sinif: '1', pct_vize: 40, pct_odev: 0, pct_uygulama: 0, pct_final: 60, pct_but: 60 });
       setInstructorSearch('');
       load();
     } catch (err) {
       console.error('Error saving course:', err);
-      await alert('Ders kaydedilirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
+      let errorMsg = err.message || 'Bilinmeyen bir hata oluştu.';
+      if (err?.data?.data) {
+        const details = Object.entries(err.data.data)
+          .map(([field, errObj]) => `${field}: ${errObj?.message || JSON.stringify(errObj)}`)
+          .join(', ');
+        if (details) errorMsg = `${errorMsg} (${details})`;
+      }
+      await alert('Ders kaydedilirken hata oluştu: ' + errorMsg, 'Hata', 'error');
     }
   };
 
@@ -531,8 +578,10 @@ export default function CoordinatorCourses() {
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-2">
-                    <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">Ders Kodu</label>
-                    <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
+                    <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">
+                      Ders Kodu <span className="text-error">*</span>
+                    </label>
+                    <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="Örn: BIL101" className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
                   </div>
                   <div>
                     <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">Şube</label>
@@ -541,18 +590,24 @@ export default function CoordinatorCourses() {
                 </div>
 
                 <div>
-                  <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">Ders Adı</label>
-                  <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
+                  <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">
+                    Ders Adı <span className="text-error">*</span>
+                  </label>
+                  <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Örn: Programlamaya Giriş" className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">Kredi</label>
-                    <input value={form.credits} onChange={e => setForm({ ...form, credits: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                    <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">
+                      Kredi <span className="text-error">*</span>
+                    </label>
+                    <input type="number" min="0" value={form.credits} onChange={e => setForm({ ...form, credits: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
                   </div>
                   <div>
-                    <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">AKTS</label>
-                    <input value={form.akts} onChange={e => setForm({ ...form, akts: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                    <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">
+                      AKTS <span className="text-error">*</span>
+                    </label>
+                    <input type="number" min="0" value={form.akts} onChange={e => setForm({ ...form, akts: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" required />
                   </div>
                   <div>
                     <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-semibold">Sınıf</label>
