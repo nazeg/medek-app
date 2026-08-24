@@ -786,21 +786,21 @@ export default function CoordinatorCourses() {
               </div>
 
               {/* Bottom Section: Full Width Sınav ve Değerlendirme Ağırlıkları */}
-              <div className="border border-outline-variant rounded-xl p-4 bg-slate-50/70 space-y-3.5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/80 pb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-on-surface flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-primary text-lg">tune</span>
+              <div className="border border-outline-variant rounded-xl p-3 bg-slate-50/70 space-y-2.5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/80 pb-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-primary text-base">tune</span>
                       Sınav ve Değerlendirme Ağırlıkları (%) <span className="text-error">*</span>
                     </span>
                     <button
                       type="button"
                       onClick={handleOpenAddSection}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-container bg-primary/10 hover:bg-primary/20 border border-primary/25 px-2.5 py-1 rounded-lg transition-all active:scale-95 shadow-sm"
-                      title="Yeni bir değerlendirme bölümü ekle"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-container bg-primary/10 hover:bg-primary/20 border border-primary/25 px-2 py-0.5 rounded-md transition-all active:scale-95 shadow-xs"
+                      title="Yeni bir sınav türü ekle"
                     >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      Ekstra Bölüm Ekle
+                      <span className="material-symbols-outlined text-[13px]">add</span>
+                      Ekstra Sınav Ekle
                     </button>
                   </div>
                   {(() => {
@@ -815,7 +815,7 @@ export default function CoordinatorCourses() {
                     const isCorrect = total === 100;
                     return (
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full border shadow-sm ${isCorrect ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-xs ${isCorrect ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
                           Toplam: {total} / 100
                         </span>
                       </div>
@@ -823,68 +823,69 @@ export default function CoordinatorCourses() {
                   })()}
                 </div>
 
-                {/* All exam weights rendered side by side across full width */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 lg:grid-cols-8 gap-3">
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Vize</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_vize ?? ''} onChange={e => setForm({ ...form, pct_vize: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                {/* All exam weights rendered side by side across full width with balanced compact sizing */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 lg:grid-cols-8 gap-2">
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Vize</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_vize ?? ''} onChange={e => setForm({ ...form, pct_vize: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Ödev</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_odev ?? ''} onChange={e => setForm({ ...form, pct_odev: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Ödev</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_odev ?? ''} onChange={e => setForm({ ...form, pct_odev: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Proje</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_proje ?? ''} onChange={e => setForm({ ...form, pct_proje: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Proje</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_proje ?? ''} onChange={e => setForm({ ...form, pct_proje: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Sunum</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_sunum ?? ''} onChange={e => setForm({ ...form, pct_sunum: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Sunum</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_sunum ?? ''} onChange={e => setForm({ ...form, pct_sunum: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Uygulama</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_uygulama ?? ''} onChange={e => setForm({ ...form, pct_uygulama: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Uygulama</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_uygulama ?? ''} onChange={e => setForm({ ...form, pct_uygulama: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
 
-                  {/* Custom dynamically added sections */}
+                  {/* Custom dynamically added sections with delete button below input */}
                   {(form.custom_weights || []).map((cw, idx) => (
-                    <div key={cw.id || idx} className="bg-primary/[0.04] p-2.5 rounded-lg border border-primary/30 shadow-xs relative group">
-                      <div className="flex items-center justify-between gap-1 mb-1.5">
-                        <label className="text-[11px] uppercase tracking-wider text-primary font-bold truncate block" title={cw.name}>
+                    <div key={cw.id || idx} className="bg-primary/[0.04] p-2 rounded-lg border border-primary/30 shadow-xs flex flex-col justify-between">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-primary font-bold block mb-1 text-center truncate" title={cw.name}>
                           {cw.name}
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => removeCustomWeight(idx)}
-                          className="text-on-surface-variant/70 hover:text-error transition-colors p-0.5 rounded-full hover:bg-error/10 flex items-center justify-center shrink-0"
-                          title={`${cw.name} bölümünü sil`}
-                        >
-                          <span className="material-symbols-outlined text-sm">close</span>
-                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          placeholder="—"
+                          value={cw.percentage ?? ''}
+                          onChange={e => updateCustomWeight(idx, 'percentage', e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                          className="w-full border border-primary/40 focus:border-primary rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary text-center font-bold text-primary h-7"
+                        />
                       </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        placeholder="—"
-                        value={cw.percentage ?? ''}
-                        onChange={e => updateCustomWeight(idx, 'percentage', e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
-                        className="w-full border border-primary/40 focus:border-primary rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 text-center font-bold text-primary"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCustomWeight(idx)}
+                        className="mt-1.5 w-full py-0.5 text-on-surface-variant/70 hover:text-error hover:bg-error/10 rounded text-[10px] font-semibold flex items-center justify-center gap-0.5 transition-colors"
+                        title={`${cw.name} sınavını kaldır`}
+                      >
+                        <span className="material-symbols-outlined text-[12px]">close</span>
+                        <span>Sil</span>
+                      </button>
                     </div>
                   ))}
 
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Final</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_final ?? ''} onChange={e => setForm({ ...form, pct_final: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Final</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_final ?? ''} onChange={e => setForm({ ...form, pct_final: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-outline-variant/80 shadow-xs">
-                    <label className="text-[11px] uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold text-center truncate">Bütünleme</label>
-                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_but ?? ''} onChange={e => setForm({ ...form, pct_but: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded-md px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary text-center font-semibold" />
+                  <div className="bg-white p-2 rounded-lg border border-outline-variant/80 shadow-xs flex flex-col justify-between">
+                    <label className="text-[10px] uppercase tracking-wider text-on-surface-variant block mb-1 font-bold text-center truncate">Bütünleme</label>
+                    <input type="number" min="0" max="100" placeholder="—" value={form.pct_but ?? ''} onChange={e => setForm({ ...form, pct_but: e.target.value === '' ? '' : Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })} className="w-full border border-outline-variant rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-primary focus:border-primary text-center font-semibold h-7" />
                   </div>
                 </div>
 
-                <span className="text-xs text-on-surface-variant block font-medium">Not: Tüm değerlendirme ağırlıklarının toplamı 100 olmalıdır. (Bütünleme, Final yerine geçer.)</span>
+                <span className="text-[11px] text-on-surface-variant block font-medium">Not: Tüm değerlendirme ağırlıklarının toplamı 100 olmalıdır. (Bütünleme, Final yerine geçer.)</span>
               </div>
             </div>
             <div className="px-6 py-4 border-t border-outline-variant flex justify-end gap-3 bg-slate-50/50 rounded-b-xl">
@@ -1001,7 +1002,7 @@ export default function CoordinatorCourses() {
             <div className="flex justify-between items-center pb-2 border-b border-outline-variant">
               <h4 className="text-sm font-bold text-on-surface flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-primary text-lg">add_circle</span>
-                Yeni Değerlendirme Bölümü
+                Yeni Sınav Ekle
               </h4>
               <button onClick={() => setShowAddSectionModal(false)} className="text-on-surface-variant hover:text-on-surface">
                 <span className="material-symbols-outlined text-base">close</span>
@@ -1011,12 +1012,12 @@ export default function CoordinatorCourses() {
             <form onSubmit={handleConfirmAddSection} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-on-surface-variant block mb-1">
-                  Bölüm / Sınav Adı <span className="text-error">*</span>
+                  Sınav Adı <span className="text-error">*</span>
                 </label>
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Örn: Laboratuvar, Quiz, Portfolyo..."
+                  placeholder="Örn: Laboratuvar, Quiz, Portfolyo, Seminer..."
                   value={newSectionName}
                   onChange={e => setNewSectionName(e.target.value)}
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
