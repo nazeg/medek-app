@@ -34,8 +34,15 @@ export function ProgramProvider({ children }) {
           expand: 'program',
           requestKey: null
         });
+        const assignedCourses = coursesList.filter(course => {
+          if (!course.instructor) return false;
+          if (Array.isArray(course.instructor)) {
+            return course.instructor.includes(user.id);
+          }
+          return course.instructor === user.id;
+        });
         const programMap = {};
-        coursesList.forEach(c => {
+        assignedCourses.forEach(c => {
           if (c.expand?.program) {
             programMap[c.expand.program.id] = c.expand.program;
           }

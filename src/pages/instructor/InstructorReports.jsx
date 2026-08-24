@@ -55,33 +55,50 @@ export default function InstructorReports() {
       return;
     }
 
-    let filter = '';
-    if (user.role === 'instructor') {
-      filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}") && term = "${activeTerm.id}"`;
-    } else if (user.role === 'coordinator' || user.role === 'program_head') {
-      if (activeProgram?.id) {
-        filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}" || program = "${activeProgram.id}") && term = "${activeTerm.id}"`;
-      } else {
-        filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}") && term = "${activeTerm.id}"`;
-      }
+    if (isInstructorView) {
+      // Strictly only courses assigned to this instructor for the active term
+      const filter = `term = "${activeTerm.id}" && (instructor ~ "${user.id}" || instructor ?= "${user.id}")`;
+      pb.collection('courses').getFullList({
+        filter,
+        sort: 'code',
+        expand: 'program,instructor'
+      }).then(list => {
+        const assignedList = list.filter(course => {
+          if (!course.instructor) return false;
+          if (Array.isArray(course.instructor)) {
+            return course.instructor.includes(user.id);
+          }
+          return course.instructor === user.id;
+        });
+        setCoursesList(assignedList);
+        if (assignedList.length > 0) {
+          setSelectedCourse(assignedList[0]);
+        } else {
+          setSelectedCourse(null);
+        }
+      }).catch(err => {
+        console.error('Error loading courses for reports:', err);
+      });
     } else {
-      filter = activeProgram ? `program = "${activeProgram.id}" && term = "${activeTerm.id}"` : `term = "${activeTerm.id}"`;
-    }
-
-    pb.collection('courses').getFullList({
-      filter,
-      sort: 'code',
-      expand: 'program'
-    }).then(list => {
-      setCoursesList(list);
-      if (list.length > 0) {
-        setSelectedCourse(list[0]);
-      } else {
-        setSelectedCourse(null);
+      let filter = `term = "${activeTerm.id}"`;
+      if (activeProgram?.id) {
+        filter += ` && program = "${activeProgram.id}"`;
       }
-    }).catch(err => {
-      console.error('Error loading courses for reports:', err);
-    });
+      pb.collection('courses').getFullList({
+        filter,
+        sort: 'code',
+        expand: 'program'
+      }).then(list => {
+        setCoursesList(list);
+        if (list.length > 0) {
+          setSelectedCourse(list[0]);
+        } else {
+          setSelectedCourse(null);
+        }
+      }).catch(err => {
+        console.error('Error loading courses for reports:', err);
+      });
+    }
   }, [user, activeTerm, activeProgram, isInstructorView]);
 
   useEffect(() => {

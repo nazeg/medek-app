@@ -23,25 +23,8 @@ export function CourseProvider({ children }) {
     }
 
     try {
-      let filter = '';
-      if (user.role === 'instructor') {
-        // Load all courses assigned to this instructor for the selected term
-        filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}") && term = "${activeTerm.id}"`;
-      } else if (user.role === 'coordinator' || user.role === 'program_head') {
-        // Coordinator sees courses they teach or courses in their active program
-        if (activeProgram?.id) {
-          filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}" || program = "${activeProgram.id}") && term = "${activeTerm.id}"`;
-        } else {
-          filter = `(instructor ~ "${user.id}" || instructor ?= "${user.id}") && term = "${activeTerm.id}"`;
-        }
-      } else {
-        // Admin or other role
-        if (activeProgram?.id) {
-          filter = `program = "${activeProgram.id}" && term = "${activeTerm.id}"`;
-        } else {
-          filter = `term = "${activeTerm.id}"`;
-        }
-      }
+      // Strictly query courses for the active term where instructor relation contains user.id
+      const filter = `term = "${activeTerm.id}" && (instructor ~ "${user.id}" || instructor ?= "${user.id}")`;
 
       const list = await pb.collection('courses').getFullList({ 
         sort: 'code',
@@ -49,11 +32,21 @@ export function CourseProvider({ children }) {
         expand: 'program,instructor',
         requestKey: null
       });
-      setCourses(list);
+
+      // Strict client-side check: ensure only courses actually assigned to this user are shown
+      const assignedList = list.filter(course => {
+        if (!course.instructor) return false;
+        if (Array.isArray(course.instructor)) {
+          return course.instructor.includes(user.id);
+        }
+        return course.instructor === user.id;
+      });
+
+      setCourses(assignedList);
       
       const savedCourseId = localStorage.getItem(`medek_active_course_id_${user.id}_${activeTerm.id}`);
       if (savedCourseId) {
-        const found = list.find(c => c.id === savedCourseId);
+        const found = assignedList.find(c => c.id === savedCourseId);
         if (found) {
           setActiveCourse(found);
           setLoading(false);
@@ -61,9 +54,9 @@ export function CourseProvider({ children }) {
         }
       }
       
-      if (list.length > 0) {
-        setActiveCourse(list[0]);
-        localStorage.setItem(`medek_active_course_id_${user.id}_${activeTerm.id}`, list[0].id);
+      if (assignedList.length > 0) {
+        setActiveCourse(assignedList[0]);
+        localStorage.setItem(`medek_active_course_id_${user.id}_${activeTerm.id}`, assignedList[0].id);
       } else {
         setActiveCourse(null);
       }
@@ -72,7 +65,7 @@ export function CourseProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [user, activeTerm, activeProgram]);
+  }, [user, activeTerm]);
 
   useEffect(() => {
     loadCourses();
