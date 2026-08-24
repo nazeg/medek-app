@@ -31,6 +31,7 @@ export default function InstructorReports() {
 
   // Tab 1 State (Detaylı Analiz)
   const [analizData, setAnalizData] = useState(null);
+  const [pcChartType, setPcChartType] = useState('bar'); // 'bar' (Sütun) | 'radar' (Radar)
 
   // Tab 2 State (Program PÇ Raporu)
   const [cohortMatrix, setCohortMatrix] = useState({});
@@ -506,57 +507,108 @@ export default function InstructorReports() {
 
     const ctxPC = document.getElementById('chartPC');
     if (ctxPC) {
-      chartPCInstance = new Chart(ctxPC, {
-        type: 'radar',
-        data: {
-          labels: analizData.pcLabels,
-          datasets: [{
-            label: '% Sağlanma',
-            data: analizData.pcSuccessData,
-            borderColor: '#006c49',
-            backgroundColor: 'rgba(0, 108, 73, 0.15)',
-            fill: true,
-            pointBackgroundColor: '#006c49',
-            pointRadius: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            datalabels: {
-              formatter: val => '%' + (Number(val) || 0).toFixed(2).replace('.', ','),
-              font: { weight: 'bold', size: 13 },
-              color: '#006c49',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              borderRadius: 4,
-              padding: { top: 2, bottom: 2, left: 4, right: 4 }
-            }
+      if (pcChartType === 'bar') {
+        chartPCInstance = new Chart(ctxPC, {
+          type: 'bar',
+          data: {
+            labels: analizData.pcLabels,
+            datasets: [{
+              label: '% Sağlanma',
+              data: analizData.pcSuccessData,
+              backgroundColor: analizData.pcSuccessData.map(v => {
+                const num = parseFloat(v) || 0;
+                if (num >= 70) return '#006c49'; // Yeşil (Başarılı)
+                if (num >= 50) return '#d97706'; // Kehribar (Orta)
+                if (num > 0) return '#ba1a1a';   // Kırmızı (Düşük)
+                return '#cbd5e1';               // Açık gri (Değerlendirilmemiş / İlişkisiz)
+              }),
+              borderRadius: 6
+            }]
           },
-          scales: {
-            r: {
-              min: 0,
-              max: 100,
-              pointLabels: {
-                font: { size: 13, weight: 'bold' },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                anchor: 'end',
+                align: 'top',
+                formatter: val => {
+                  const num = parseFloat(val) || 0;
+                  if (num === 0) return '—';
+                  return '%' + num.toFixed(2).replace('.', ',');
+                },
+                font: { weight: 'bold', size: 12 },
                 color: '#0b1c30'
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  callback: v => '%' + v
+                }
               },
-              ticks: {
-                font: { size: 10 },
-                backdropColor: 'transparent'
+              x: {
+                grid: { display: false }
               }
             }
           }
-        }
-      });
+        });
+      } else {
+        chartPCInstance = new Chart(ctxPC, {
+          type: 'radar',
+          data: {
+            labels: analizData.pcLabels,
+            datasets: [{
+              label: '% Sağlanma',
+              data: analizData.pcSuccessData,
+              borderColor: '#006c49',
+              backgroundColor: 'rgba(0, 108, 73, 0.15)',
+              fill: true,
+              pointBackgroundColor: '#006c49',
+              pointRadius: 4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                formatter: val => '%' + (Number(val) || 0).toFixed(2).replace('.', ','),
+                font: { weight: 'bold', size: 13 },
+                color: '#006c49',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                borderRadius: 4,
+                padding: { top: 2, bottom: 2, left: 4, right: 4 }
+              }
+            },
+            scales: {
+              r: {
+                min: 0,
+                max: 100,
+                pointLabels: {
+                  font: { size: 13, weight: 'bold' },
+                  color: '#0b1c30'
+                },
+                ticks: {
+                  font: { size: 10 },
+                  backdropColor: 'transparent'
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     return () => {
       if (chartDCInstance) chartDCInstance.destroy();
       if (chartPCInstance) chartPCInstance.destroy();
     };
-  }, [analizData]);
+  }, [analizData, pcChartType]);
 
   // Tab 2: Program Raporu calculation
   const calculateProgramReport = async () => {
@@ -1064,8 +1116,28 @@ export default function InstructorReports() {
                   </div>
                   <div className="border border-outline-variant rounded-xl p-4 bg-white">
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="text-sm font-bold text-on-surface">Program Çıktısı (PÇ) Sağlanma %</h4>
-                      <span className="text-[11px] font-semibold text-slate-400">PÇ-DÇ Ağırlıklı Dağılım</span>
+                      <div>
+                        <h4 className="text-sm font-bold text-on-surface">Program Çıktısı (PÇ) Sağlanma %</h4>
+                        <span className="text-[11px] font-semibold text-slate-400">PÇ-DÇ Ağırlıklı Dağılım</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                        <button
+                          onClick={() => setPcChartType('bar')}
+                          className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${pcChartType === 'bar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                          title="Sütun Grafiği (Daha Anlaşılır ve Net)"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">bar_chart</span>
+                          Sütun
+                        </button>
+                        <button
+                          onClick={() => setPcChartType('radar')}
+                          className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${pcChartType === 'radar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                          title="Radar Grafiği"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">radar</span>
+                          Radar
+                        </button>
+                      </div>
                     </div>
                     <div className="relative h-[300px]">
                       <canvas id="chartPC"></canvas>
