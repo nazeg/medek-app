@@ -515,7 +515,9 @@ export default function InstructorReports() {
             data: analizData.pcSuccessData,
             borderColor: '#006c49',
             backgroundColor: 'rgba(0, 108, 73, 0.15)',
-            fill: true
+            fill: true,
+            pointBackgroundColor: '#006c49',
+            pointRadius: 4
           }]
         },
         options: {
@@ -525,12 +527,26 @@ export default function InstructorReports() {
             legend: { display: false },
             datalabels: {
               formatter: val => '%' + (Number(val) || 0).toFixed(2).replace('.', ','),
-              font: { weight: 'bold', size: 11 },
-              color: '#006c49'
+              font: { weight: 'bold', size: 13 },
+              color: '#006c49',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              borderRadius: 4,
+              padding: { top: 2, bottom: 2, left: 4, right: 4 }
             }
           },
           scales: {
-            r: { min: 0, max: 100 }
+            r: {
+              min: 0,
+              max: 100,
+              pointLabels: {
+                font: { size: 13, weight: 'bold' },
+                color: '#0b1c30'
+              },
+              ticks: {
+                font: { size: 10 },
+                backdropColor: 'transparent'
+              }
+            }
           }
         }
       });
@@ -1094,6 +1110,51 @@ export default function InstructorReports() {
                             </div>
                             <p className="text-[10px] text-slate-500 line-clamp-2 mt-1" title={dc.description}>
                               {dc.description || 'DÇ Tanımı'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* PÇ Sağlanma Yüzdeleri Özet Kartları (Büyük Küsüratlı Rakamlar) */}
+                {analizData.pcs.length > 0 && (
+                  <div className="border border-outline-variant rounded-xl p-5 bg-white space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-[#006c49] flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-base">grade</span>
+                        Program Çıktısı (PÇ) Sağlanma Yüzdeleri
+                      </h4>
+                      <span className="text-[11px] font-medium text-slate-500">
+                        PÇ-DÇ Matris Ağırlıklı Değerlendirmesi
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
+                      {analizData.pcs.map((pc, i) => {
+                        const pct = parseFloat(analizData.pcSuccessData[i]) || 0;
+                        const pctFormatted = pct.toFixed(2).replace('.', ',');
+                        return (
+                          <div 
+                            key={pc.id} 
+                            className="p-3 rounded-xl border border-outline-variant/80 bg-emerald-50/30 hover:bg-emerald-50/50 transition-all flex flex-col justify-between shadow-2xs group"
+                          >
+                            <div className="flex items-center justify-between gap-1 mb-2">
+                              <span className="font-bold text-xs text-[#006c49] px-2 py-0.5 rounded bg-emerald-100 border border-emerald-300">
+                                {pc.code}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getBadgeColorByValue(pct)}`}>
+                                {pct >= 70 ? 'Başarılı' : pct >= 50 ? 'Orta' : 'Düşük'}
+                              </span>
+                            </div>
+                            <div className="my-1 text-center sm:text-left">
+                              <span className="text-2xl font-black text-[#006c49] tracking-tight block">
+                                %{pctFormatted}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-1" title={pc.description}>
+                              {pc.description || 'PÇ Tanımı'}
                             </p>
                           </div>
                         );
