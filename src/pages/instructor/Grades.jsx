@@ -314,12 +314,13 @@ export default function Grades() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(`${examName} Notları`);
 
-    worksheet.views = [{ showGridLines: true }];
+    // Freeze top row for scrolling & enable gridlines
+    worksheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
 
     // Columns
     const columns = [
-      { header: 'Öğrenci No', key: 'number', width: 15 },
-      { header: 'Ad Soyad', key: 'name', width: 25 }
+      { header: 'Öğrenci No', key: 'number', width: 18 },
+      { header: 'Ad Soyad', key: 'name', width: 28 }
     ];
 
     questions.forEach(q => {
@@ -333,9 +334,9 @@ export default function Grades() {
 
     worksheet.columns = columns;
 
-    // Headings Style
+    // Headings Style (Only row 1 is locked)
     const headerRow = worksheet.getRow(1);
-    headerRow.height = 30;
+    headerRow.height = 32;
     for (let c = 1; c <= columns.length; c++) {
       const cell = headerRow.getCell(c);
       cell.fill = {
@@ -363,7 +364,7 @@ export default function Grades() {
       cell.protection = { locked: true };
     }
 
-    // Add Student Rows
+    // Add Student Rows (All columns UNLOCKED so users can freely edit numbers, names, and grades)
     students.forEach((student, index) => {
       const rowData = {
         number: student.number,
@@ -386,32 +387,16 @@ export default function Grades() {
       });
 
       const row = worksheet.addRow(rowData);
-      row.height = 20;
+      row.height = 22;
 
       const isZebra = (index % 2 === 0);
       const bgColor = isZebra ? 'FFF8F9FA' : 'FFFFFFFF';
 
-      // Column 1 & 2: Student Number and Name (Locked)
-      for (let c = 1; c <= 2; c++) {
+      for (let c = 1; c <= columns.length; c++) {
         const cell = row.getCell(c);
-        cell.protection = { locked: true };
-        cell.font = { name: 'Segoe UI', size: 10 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-          bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-          left: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-          right: { style: 'thin', color: { argb: 'FFE0E0E0' } }
-        };
-      }
-
-      // Columns 3+: Question Grades (Unlocked)
-      for (let c = 3; c <= columns.length; c++) {
-        const cell = row.getCell(c);
-        cell.protection = { locked: false };
-        cell.font = { name: 'Segoe UI', size: 10, bold: true };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.protection = { locked: false }; // Unlocked
+        cell.font = { name: 'Segoe UI', size: 10, bold: c > 2 };
+        cell.alignment = { vertical: 'middle', horizontal: c <= 2 ? 'left' : 'center' };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
         cell.border = {
           top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
@@ -422,21 +407,27 @@ export default function Grades() {
       }
     });
 
-    // Protect Sheet
+    // Pre-unlock empty rows (up to 300 rows) so users can type or paste new students freely!
+    const startEmptyRow = students.length + 2;
+    const endEmptyRow = Math.max(startEmptyRow + 200, 300);
+    for (let r = startEmptyRow; r <= endEmptyRow; r++) {
+      const row = worksheet.getRow(r);
+      for (let c = 1; c <= columns.length; c++) {
+        row.getCell(c).protection = { locked: false };
+      }
+    }
+
+    // Protect Sheet (Only header row is locked)
     await worksheet.protect('', {
       selectLockedCells: true,
       selectUnlockedCells: true,
       formatCells: true,
       formatColumns: true,
       formatRows: true,
-      insertColumns: false,
-      insertRows: false,
-      insertHyperlinks: false,
-      deleteColumns: false,
-      deleteRows: false,
+      insertRows: true,
+      deleteRows: true,
       sort: true,
-      autoFilter: true,
-      pivotTables: false
+      autoFilter: true
     });
 
     // Write file
