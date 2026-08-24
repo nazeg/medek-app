@@ -14,6 +14,7 @@ export default function CoordinatorCourseOutcomes() {
   const { activeCourse, selectCourse, courses: instructorCourses } = useActiveCourse();
   const { confirm } = useAlertConfirm();
   const [outcomes, setOutcomes] = useState([]);
+  const [programOutcomes, setProgramOutcomes] = useState([]);
   const [courses, setCourses] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -29,22 +30,31 @@ export default function CoordinatorCourseOutcomes() {
     if (!hasAccess) {
       if (isInstructorView) {
         setOutcomes([]);
+        setProgramOutcomes([]);
         setCourses([]);
       }
       return;
     }
     try {
       if (isInstructorView) {
-        const o = await pb.collection('course_outcomes').getFullList({ 
-          sort: 'code', 
-          filter: `course = "${activeCourse.id}"`,
-          expand: 'course' 
-        });
+        const [o, po] = await Promise.all([
+          pb.collection('course_outcomes').getFullList({ 
+            sort: 'code', 
+            filter: `course = "${activeCourse.id}"`,
+            expand: 'course' 
+          }),
+          activeCourse.program ? pb.collection('program_outcomes').getFullList({
+            sort: 'code',
+            filter: `program = "${activeCourse.program}"`
+          }) : Promise.resolve([])
+        ]);
         o.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+        po.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
         setOutcomes(o);
+        setProgramOutcomes(po);
         setCourses([activeCourse]);
       } else {
-        const [o, c] = await Promise.all([
+        const [o, c, po] = await Promise.all([
           pb.collection('course_outcomes').getFullList({ 
             sort: 'code', 
             filter: `course.program = "${activeProgram.id}"`,
@@ -54,14 +64,20 @@ export default function CoordinatorCourseOutcomes() {
             sort: 'code',
             filter: `program = "${activeProgram.id}"`
           }),
+          pb.collection('program_outcomes').getFullList({
+            sort: 'code',
+            filter: `program = "${activeProgram.id}"`
+          })
         ]);
         o.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
         c.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+        po.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
         setOutcomes(o);
         setCourses(c);
+        setProgramOutcomes(po);
       }
     } catch (err) {
-      console.error('Error loading course outcomes:', err);
+      console.error('Error loading course and program outcomes:', err);
     }
   };
 
@@ -185,6 +201,59 @@ export default function CoordinatorCourseOutcomes() {
               })}
               {(selectedCourseId ? courses.filter(c => c.id === selectedCourseId) : courses).length === 0 && (
                 <div className="text-center py-8 text-on-surface-variant text-sm">Ders bulunamadı.</div>
+              )}
+
+              {/* Program Outcomes (PÇ) - Read-only reference for Instructors */}
+              {isInstructorView && activeCourse && (
+                <div className="border border-outline-variant rounded-xl overflow-hidden bg-white shadow-sm mt-6">
+                  <div className="px-5 py-3.5 bg-slate-50 border-b border-outline-variant flex flex-wrap justify-between items-center gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="material-symbols-outlined text-primary text-xl">fact_check</span>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-sm">
+                          Program Çıktıları (PÇ) {activeCourse.expand?.program?.name ? `— ${activeCourse.expand.program.name}` : ''}
+                        </h4>
+                        <p className="text-[11px] text-on-surface-variant">Bölüm başkanlığı tarafından tanımlanan program hedefleri (Bilgilendirme Amaçlı)</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                      <span className="material-symbols-outlined text-xs text-slate-500">lock</span>
+                      Salt Okunur ({programOutcomes.length} PÇ)
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/50 text-on-surface-variant text-[11px] font-semibold uppercase border-b border-outline-variant">
+                          <th className="px-5 py-2.5 font-semibold w-24">PÇ Kodu</th>
+                          <th className="px-5 py-2.5 font-semibold">Kazanım / Program Çıktısı Açıklaması</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant">
+                        {programOutcomes.map(po => (
+                          <tr key={po.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-5 py-3 font-bold text-primary text-sm whitespace-nowrap align-top">
+                              <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-xs font-bold">
+                                {po.code}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-sm text-on-surface leading-relaxed">
+                              {po.description}
+                            </td>
+                          </tr>
+                        ))}
+                        {programOutcomes.length === 0 && (
+                          <tr>
+                            <td colSpan={2} className="px-5 py-8 text-center text-on-surface-variant text-xs font-medium">
+                              Bu programa ait bölüm başkanlığı tarafından henüz tanımlanmış Program Çıktısı (PÇ) bulunmamaktadır.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </div>
           </>
