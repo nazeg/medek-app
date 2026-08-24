@@ -36,18 +36,27 @@ export default function InstructorDashboard() {
         
         // Fetch courses for this instructor and active term
         const assignedCourses = await pb.collection('courses').getFullList({
-          filter: `instructor ~ "${user.id}" && term = "${activeTerm.id}"`,
+          filter: `term = "${activeTerm.id}" && (instructor ~ "${user.id}" || instructor ?= "${user.id}")`,
           expand: 'program',
           sort: 'code'
         });
-        setCourses(assignedCourses);
+        
+        const filteredCourses = assignedCourses.filter(course => {
+          if (!course.instructor) return false;
+          if (Array.isArray(course.instructor)) {
+            return course.instructor.includes(user.id);
+          }
+          return course.instructor === user.id;
+        });
+
+        setCourses(filteredCourses);
 
         let dcsCount = 0;
         let examsCount = 0;
         const courseStats = {};
 
-        if (assignedCourses.length > 0) {
-          const courseIdsFilter = assignedCourses.map(c => `course = "${c.id}"`).join(' || ');
+        if (filteredCourses.length > 0) {
+          const courseIdsFilter = filteredCourses.map(c => `course = "${c.id}"`).join(' || ');
           
           const [dcsList, examsList] = await Promise.all([
             pb.collection('course_outcomes').getFullList({
@@ -62,12 +71,10 @@ export default function InstructorDashboard() {
           examsCount = examsList.length;
 
           // Map stats to each course
-          assignedCourses.forEach(c => {
+          filteredCourses.forEach(c => {
             const courseDcs = dcsList.filter(d => d.course === c.id);
-            const courseExams = examsList.filter(e => e.course === c.id);
             courseStats[c.id] = {
-              dcs: courseDcs.length,
-              exams: courseExams.map(e => e.type).join(', ') || 'Tanımlanmamış'
+              dcs: courseDcs.length
             };
           });
         }
@@ -75,16 +82,15 @@ export default function InstructorDashboard() {
         const studentsRes = await pb.collection('students').getList(1, 1);
 
         setStats({
-          coursesCount: assignedCourses.length,
+          coursesCount: filteredCourses.length,
           outcomesCount: dcsCount,
           examsCount: examsCount,
           studentsCount: studentsRes.totalItems
         });
 
-        setCoursesWithStats(assignedCourses.map(c => ({
+        setCoursesWithStats(filteredCourses.map(c => ({
           ...c,
-          dcsCount: courseStats[c.id]?.dcs || 0,
-          examsStr: courseStats[c.id]?.exams || 'Tanımlanmamış'
+          dcsCount: courseStats[c.id]?.dcs || 0
         })));
 
       } catch (err) {
@@ -100,6 +106,28 @@ export default function InstructorDashboard() {
   const handleQuickAction = (courseId, path) => {
     selectCourse(courseId);
     navigate(path);
+  };
+
+  const getExamWeightsSummary = (course) => {
+    const parts = [];
+    if (course.pct_vize) parts.push({ label: 'Vize', pct: course.pct_vize, type: 'standard' });
+    if (course.pct_odev) parts.push({ label: 'Ödev', pct: course.pct_odev, type: 'standard' });
+    if (course.pct_proje) parts.push({ label: 'Proje', pct: course.pct_proje, type: 'standard' });
+    if (course.pct_sunum) parts.push({ label: 'Sunum', pct: course.pct_sunum, type: 'standard' });
+    if (course.pct_uygulama) parts.push({ label: 'Uygulama', pct: course.pct_uygulama, type: 'standard' });
+    
+    if (Array.isArray(course.custom_weights)) {
+      course.custom_weights.forEach(cw => {
+        if (cw.name && cw.percentage) {
+          parts.push({ label: cw.name, pct: cw.percentage, type: 'custom' });
+        }
+      });
+    }
+    
+    if (course.pct_final) parts.push({ label: 'Final', pct: course.pct_final, type: 'final' });
+    if (course.pct_but) parts.push({ label: 'Büt', pct: course.pct_but, type: 'but' });
+    
+    return parts;
   };
 
   const statCards = [
@@ -193,73 +221,121 @@ export default function InstructorDashboard() {
             </div>
           ) : coursesWithStats.length > 0 ? (
             <div className="space-y-4">
-              {coursesWithStats.map(course => (
-                <div
-                  key={course.id}
-                  className="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden hover:border-primary/40 transition-all group"
-                >
-                  <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50 border-b border-slate-100">
-                    <div className="flex gap-4 items-center">
-                      <div className="bg-primary text-white px-3 py-1.5 rounded-lg text-label-md font-bold uppercase tracking-wider text-[11px]">
-                        {course.code}
+              {coursesWithStats.map(course => {
+                const examWeights = getExamWeightsSummary(course);
+                return (
+                  <div
+                    key={course.id}
+                    className="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden hover:border-primary/40 transition-all group"
+                  >
+                    <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50 border-b border-slate-100">
+                      <div className="flex gap-4 items-center">
+                        <div className="bg-primary text-white px-3 py-1.5 rounded-lg text-label-md font-bold uppercase tracking-wider text-[11px] font-mono shadow-xs">
+                          {course.code}
+                        </div>
+                        <div>
+                          <h4 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors">{course.name}</h4>
+                          <p className="text-body-md text-on-surface-variant font-medium mt-0.5">{course.expand?.program?.name || '—'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors">{course.name}</h4>
-                        <p className="text-body-md text-on-surface-variant font-medium mt-0.5">{course.expand?.program?.name || '—'}</p>
+
+                      {/* Course Badges: Credits, ECTS, Class, Branch */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {course.credits !== undefined && course.credits !== '' && (
+                          <span className="text-xs font-bold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200/80 shadow-2xs">
+                            {course.credits} Kredi
+                          </span>
+                        )}
+                        {course.akts !== undefined && course.akts !== '' && (
+                          <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 shadow-2xs">
+                            {course.akts} AKTS
+                          </span>
+                        )}
+                        {course.sinif && (
+                          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                            {course.sinif}. Sınıf
+                          </span>
+                        )}
+                        {course.sube && (
+                          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                            Şube {course.sube}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200/50">
-                      {course.sinif}. Sınıf
+
+                    <div className="p-5 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-on-surface-variant border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[#7C3AED] text-lg shrink-0">description</span>
+                          <span>
+                            Ders Çıktısı (DÇ): <strong className="text-on-surface font-semibold">{course.dcsCount} adet</strong>
+                          </span>
+                        </div>
+                        
+                        {/* Assessment Weights */}
+                        <div className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-[#D97706] text-lg shrink-0 mt-0.5">assignment</span>
+                          <div className="space-y-1">
+                            <span className="text-xs text-on-surface-variant font-medium block">Sınav Ağırlıkları:</span>
+                            {examWeights.length === 0 ? (
+                              <span className="text-xs text-slate-400 font-medium italic">Tanımlanmamış</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {examWeights.map((w, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md border shadow-2xs ${
+                                      w.type === 'custom'
+                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                        : w.type === 'final'
+                                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                        : w.type === 'but'
+                                        ? 'bg-slate-100 text-slate-700 border-slate-300'
+                                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                                    }`}
+                                  >
+                                    {w.label} (%{w.pct})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div className="text-xs text-on-surface-variant/70 italic">
+                          İşlemler için sağdaki butonları kullanabilirsiniz.
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleQuickAction(course.id, '/instructor/exams')}
+                            className="px-3.5 py-2 border border-outline-variant text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">design_services</span>
+                            Sınav Planı
+                          </button>
+                          <button
+                            onClick={() => handleQuickAction(course.id, '/instructor/grades')}
+                            className="px-3.5 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold hover:bg-primary hover:text-white active:scale-95 transition-all flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">edit_note</span>
+                            Not Girişi
+                          </button>
+                          <button
+                            onClick={() => handleQuickAction(course.id, '/instructor/reports')}
+                            className="px-3 py-2 text-on-surface-variant hover:text-primary rounded-lg text-xs font-bold hover:bg-slate-100 active:scale-95 transition-all flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">analytics</span>
+                            Rapor Al
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="p-5 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-on-surface-variant border-b border-slate-100 pb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[#7C3AED] text-lg">description</span>
-                        <span>
-                          Ders Çıktısı (DÇ): <strong className="text-on-surface font-semibold">{course.dcsCount} adet</strong>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[#D97706] text-lg">assignment</span>
-                        <span>
-                          Değerlendirmeler: <strong className="text-on-surface font-semibold">{course.examsStr}</strong>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                      <div className="text-xs text-on-surface-variant/70 italic">
-                        İşlemler için sağdaki butonları kullanabilirsiniz.
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleQuickAction(course.id, '/instructor/exams')}
-                          className="px-3.5 py-2 border border-outline-variant text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-1.5"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">design_services</span>
-                          Sınav Planı
-                        </button>
-                        <button
-                          onClick={() => handleQuickAction(course.id, '/instructor/grades')}
-                          className="px-3.5 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold hover:bg-primary hover:text-white active:scale-95 transition-all flex items-center gap-1.5"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">edit_note</span>
-                          Not Girişi
-                        </button>
-                        <button
-                          onClick={() => handleQuickAction(course.id, '/instructor/reports')}
-                          className="px-3 py-2 text-on-surface-variant hover:text-primary rounded-lg text-xs font-bold hover:bg-slate-100 active:scale-95 transition-all flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">analytics</span>
-                          Rapor Al
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white border border-dashed border-outline-variant rounded-xl p-10 text-center text-slate-500 font-medium">
