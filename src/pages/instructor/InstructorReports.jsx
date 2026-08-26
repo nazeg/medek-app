@@ -963,22 +963,13 @@ export default function InstructorReports() {
         }
 
         if (imgHeight <= usableHeight) {
-          pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
+          const offsetY = margin + (usableHeight - imgHeight) / 2;
+          pdf.addImage(imgData, 'JPEG', margin, offsetY, imgWidth, imgHeight);
         } else {
           const scaledWidth = (canvas.width * usableHeight) / canvas.height;
           const offsetX = margin + (usableWidth - scaledWidth) / 2;
           pdf.addImage(imgData, 'JPEG', offsetX, margin, scaledWidth, usableHeight);
         }
-
-        // Add page footer
-        pdf.setFontSize(8);
-        pdf.setTextColor(140, 140, 140);
-        pdf.text(
-          `MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi — Sayfa ${i + 1} / ${pages.length}`,
-          pageWidth / 2,
-          pageHeight - 4,
-          { align: 'center' }
-        );
       }
 
       pdf.save(filename);
@@ -1077,22 +1068,13 @@ export default function InstructorReports() {
         }
 
         if (imgHeight <= usableHeight) {
-          pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
+          const offsetY = margin + (usableHeight - imgHeight) / 2;
+          pdf.addImage(imgData, 'JPEG', margin, offsetY, imgWidth, imgHeight);
         } else {
           const scaledWidth = (canvas.width * usableHeight) / canvas.height;
           const offsetX = margin + (usableWidth - scaledWidth) / 2;
           pdf.addImage(imgData, 'JPEG', offsetX, margin, scaledWidth, usableHeight);
         }
-
-        // Add page footer
-        pdf.setFontSize(8);
-        pdf.setTextColor(140, 140, 140);
-        pdf.text(
-          `MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi — Sayfa ${i + 1} / ${pages.length}`,
-          pageWidth / 2,
-          pageHeight - 4,
-          { align: 'center' }
-        );
       }
 
       pdf.save(filename);
@@ -1257,879 +1239,906 @@ export default function InstructorReports() {
               </div>
 
               {/* PDF PRINT AREA CONTAINER */}
-              <div ref={printCourseRef} className="space-y-8">
-                
-                {/* ========================================================
-                    PAGE 1: GENEL BAKIŞ, GRAFİKLER VE PÇ-DÇ MATRİSİ
-                   ======================================================== */}
-                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-6">
-                  {/* PDF & Screen Header */}
-                  <div className="text-center pb-5 border-b-2 border-outline-variant space-y-2">
-                    <h2 className="text-2xl font-black text-[#0058be] tracking-tight">
-                      {selectedCourse.expand?.program?.name || 'Program Belirtilmedi'}
-                    </h2>
+              {(() => {
+                const STUDENTS_PER_PAGE = 30;
+                const chunkArray = (arr, size) => {
+                  if (!arr || arr.length === 0) return [[]];
+                  const chunks = [];
+                  for (let i = 0; i < arr.length; i += size) {
+                    chunks.push(arr.slice(i, i + size));
+                  }
+                  return chunks;
+                };
+                const studentChunks = chunkArray(analizData.students, STUDENTS_PER_PAGE);
+                const numKazanimPages = studentChunks.length;
+                const numBasariPages = studentChunks.length;
+                const totalCoursePages = 3 + numKazanimPages + numBasariPages;
+
+                return (
+                  <div ref={printCourseRef} className="space-y-8">
                     
-                    {/* Dönem Bilgisi */}
-                    <div className="flex justify-center">
-                      <span className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-slate-100/80 text-slate-700 rounded-full border border-slate-200 text-xs font-bold shadow-2xs leading-none">
-                        <span className="material-symbols-outlined text-[15px] leading-none text-slate-500">calendar_month</span>
-                        <span className="leading-none">{activeTerm?.name || 'Dönem Belirtilmedi'}</span>
-                      </span>
-                    </div>
-
-                    <h3 className="text-lg font-bold text-slate-800 mt-1">
-                      {selectedCourse.code} - {selectedCourse.name} {selectedCourse.sube ? `(Şube: ${selectedCourse.sube})` : ''}
-                    </h3>
-
-                    {/* Öğretim Elemanı, Öğrenci Sayısı ve Sınav Modülü Rozetleri */}
-                    <div className="flex flex-wrap justify-center items-center gap-2.5 pt-1.5 text-xs font-semibold text-slate-600">
-                      <span className="inline-flex items-center justify-center gap-1.5 bg-blue-50 text-blue-800 border border-blue-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
-                        <span className="material-symbols-outlined text-[15px] leading-none">person</span>
-                        <span className="leading-none">
-                          <strong>Öğretim Elemanı:</strong>{' '}
-                          {(() => {
-                            const instructors = selectedCourse.expand?.instructor;
-                            if (Array.isArray(instructors) && instructors.length > 0) {
-                              return instructors.map(inst => inst.title ? `${inst.title} ${inst.name}` : inst.name).join(', ');
-                            } else if (instructors?.name) {
-                              return instructors.title ? `${instructors.title} ${instructors.name}` : instructors.name;
-                            } else if (user?.name) {
-                              return user.title ? `${user.title} ${user.name}` : user.name;
-                            }
-                            return 'Tanımlanmadı';
-                          })()}
-                        </span>
-                      </span>
-
-                      <span className="inline-flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
-                        <span className="material-symbols-outlined text-[15px] leading-none">group</span>
-                        <span className="leading-none"><strong>Öğrenci Sayısı:</strong> {analizData.students?.length || 0} Kişi</span>
-                      </span>
-
-                      <span className="inline-flex items-center justify-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
-                        <span className="material-symbols-outlined text-[15px] leading-none">analytics</span>
-                        <span className="leading-none"><strong>Sınav Modülü:</strong> {analizData.modName}</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Charts Area */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-sm font-bold text-on-surface">Ders Çıktısı (DÇ) Başarı %</h4>
-                        <span className="text-[11px] font-semibold text-slate-400">2 Basamaklı Hassasiyet</span>
-                      </div>
-                      <div className="relative h-[270px]">
-                        <canvas id="chartDC"></canvas>
-                      </div>
-                    </div>
-                    <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                      <div className="flex justify-between items-center mb-3">
-                        <div>
-                          <h4 className="text-sm font-bold text-on-surface">Program Çıktısı (PÇ) Sağlanma %</h4>
-                          <span className="text-[11px] font-semibold text-slate-400">PÇ-DÇ Ağırlıklı Dağılım</span>
+                    {/* ========================================================
+                        PAGE 1: GENEL BAKIŞ, GRAFİKLER VE PÇ-DÇ MATRİSİ
+                       ======================================================== */}
+                    <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-6">
+                      {/* PDF & Screen Header */}
+                      <div className="text-center pb-5 border-b-2 border-outline-variant space-y-2">
+                        <h2 className="text-2xl font-black text-[#0058be] tracking-tight">
+                          {selectedCourse.expand?.program?.name || 'Program Belirtilmedi'}
+                        </h2>
+                        
+                        {/* Dönem Bilgisi */}
+                        <div className="flex justify-center">
+                          <span className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-slate-100/80 text-slate-700 rounded-full border border-slate-200 text-xs font-bold shadow-2xs leading-none">
+                            <span className="material-symbols-outlined text-[15px] leading-none text-slate-500">calendar_month</span>
+                            <span className="leading-none">{activeTerm?.name || 'Dönem Belirtilmedi'}</span>
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-                          <button
-                            onClick={() => setPcChartType('bar')}
-                            className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${pcChartType === 'bar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                            title="Sütun Grafiği (Daha Anlaşılır ve Net)"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">bar_chart</span>
-                            Sütun
-                          </button>
-                          <button
-                            onClick={() => setPcChartType('radar')}
-                            className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${pcChartType === 'radar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                            title="Radar Grafiği"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">radar</span>
-                            Radar
-                          </button>
+
+                        <h3 className="text-lg font-bold text-slate-800 mt-1">
+                          {selectedCourse.code} - {selectedCourse.name} {selectedCourse.sube ? `(Şube: ${selectedCourse.sube})` : ''}
+                        </h3>
+
+                        {/* Öğretim Elemanı, Öğrenci Sayısı ve Sınav Modülü Rozetleri */}
+                        <div className="flex flex-wrap justify-center items-center gap-2.5 pt-1.5 text-xs font-semibold text-slate-600">
+                          <span className="inline-flex items-center justify-center gap-1.5 bg-blue-50 text-blue-800 border border-blue-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
+                            <span className="material-symbols-outlined text-[15px] leading-none">person</span>
+                            <span className="leading-none">
+                              <strong>Öğretim Elemanı:</strong>{' '}
+                              {(() => {
+                                const instructors = selectedCourse.expand?.instructor;
+                                if (Array.isArray(instructors) && instructors.length > 0) {
+                                  return instructors.map(inst => inst.title ? `${inst.title} ${inst.name}` : inst.name).join(', ');
+                                } else if (instructors?.name) {
+                                  return instructors.title ? `${instructors.title} ${instructors.name}` : instructors.name;
+                                } else if (user?.name) {
+                                  return user.title ? `${user.title} ${user.name}` : user.name;
+                                }
+                                return 'Tanımlanmadı';
+                              })()}
+                            </span>
+                          </span>
+
+                          <span className="inline-flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
+                            <span className="material-symbols-outlined text-[15px] leading-none">group</span>
+                            <span className="leading-none"><strong>Öğrenci Sayısı:</strong> {analizData.students?.length || 0} Kişi</span>
+                          </span>
+
+                          <span className="inline-flex items-center justify-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
+                            <span className="material-symbols-outlined text-[15px] leading-none">analytics</span>
+                            <span className="leading-none"><strong>Sınav Modülü:</strong> {analizData.modName}</span>
+                          </span>
                         </div>
                       </div>
-                      <div className="relative h-[270px]">
-                        <canvas id="chartPC"></canvas>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Outcome matrix details */}
-                  {analizData.pcs.length > 0 && analizData.dcs.length > 0 && (
-                    <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                      <h4 className="text-xs font-bold text-[#825100] mb-2.5">🔗 Mevcut PÇ-DÇ Matris Değerleri</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-outline-variant">
-                              <th className="px-3 py-2 font-bold text-on-surface">DÇ / PÇ</th>
-                              {analizData.pcs.map(pc => (
-                                <th key={pc.id} className="px-2 py-2 text-center font-bold bg-[#e8f5e9] text-[#006c49]">{pc.code}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {analizData.dcs.map(dc => (
-                              <tr key={dc.id} className="hover:bg-slate-50/50">
-                                <td className="px-3 py-1.5 font-bold text-on-surface">{dc.code}</td>
-                                {analizData.pcs.map(pc => {
-                                  const entry = analizData.matrix.find(m => m.dc === dc.id && m.pc === pc.id);
-                                  const val = entry ? entry.level : 0;
-                                  return (
-                                    <td
-                                      key={pc.id}
-                                      className={`px-2 py-1.5 text-center font-bold ${val > 0 ? 'bg-[#d4edda] text-[#155724]' : 'text-slate-300'}`}
-                                    >
-                                      {val}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ========================================================
-                    PAGE 2: SINAV SORU TANIMLAMA BİLGİLERİ
-                   ======================================================== */}
-                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
-                  {/* Page Sub Header */}
-                  <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
-                    <div>
-                      <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
-                      <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
-                    </div>
-                    <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
-                      {analizData.modName}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-bold text-on-surface mb-3">📝 Sınav Soru Tanımlama Bilgileri</h4>
-                    <div className={analizData.reqExams.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "w-full"}>
-                      {analizData.reqExams.map(et => {
-                        const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
-                        if (examQuestions.length === 0) return null;
-                        const maxTotal = examQuestions.reduce((s, q) => s + (q.max_score || 0), 0);
-                        const isSingleExam = analizData.reqExams.length === 1;
-                        const shouldSplit = isSingleExam && examQuestions.length > 8;
-
-                        const renderTable = (list) => (
-                          <table className="w-full text-left text-[11px] border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50/50 border-b border-slate-200 font-semibold text-slate-600">
-                                <th className="px-2.5 py-1.5 text-center w-12">Kod</th>
-                                <th className="px-2.5 py-1.5">Tür</th>
-                                <th className="px-2.5 py-1.5 text-center">DÇ</th>
-                                <th className="px-2.5 py-1.5 text-center w-16">Puan</th>
-                                <th className="px-2.5 py-1.5 text-center w-16">Cevap</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {list.map(q => {
-                                const qDcs = getQuestionDcCodes(q);
-                                return (
-                                  <tr key={q.id} className="hover:bg-slate-50/50">
-                                    <td className="px-2.5 py-1.5 font-bold text-center font-mono">{q.code || `S${q.number}`}</td>
-                                    <td className="px-2.5 py-1.5 text-slate-600 font-medium">{q.type}</td>
-                                    <td className="px-2.5 py-1.5 text-center">
-                                      {qDcs.map(code => (
-                                        <span key={code} className="inline-flex items-center justify-center bg-[#0058be]/10 text-[#0058be] px-1.5 py-0.5 rounded text-[10px] font-bold mx-0.5 leading-none">{code}</span>
-                                      ))}
-                                    </td>
-                                    <td className="px-2.5 py-1.5 font-bold text-center">{q.max_score}</td>
-                                    <td className="px-2.5 py-1.5 text-center text-[#006c49] font-bold">{q.answer || '—'}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        );
-
-                        if (shouldSplit) {
-                          const mid = Math.ceil(examQuestions.length / 2);
-                          const left = examQuestions.slice(0, mid);
-                          const right = examQuestions.slice(mid);
-
-                          return (
-                            <div key={et} className="w-full border border-outline-variant rounded-lg overflow-hidden bg-white">
-                              <div className="bg-slate-50 border-b border-outline-variant px-3.5 py-2 flex justify-between items-center text-xs font-bold text-on-surface w-full">
-                                <span>{et}</span>
-                                <span className="text-slate-500 font-normal">({examQuestions.length} soru — Toplam: {maxTotal} puan)</span>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-outline-variant">
-                                <div>{renderTable(left)}</div>
-                                <div>{renderTable(right)}</div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={et} className="w-full border border-outline-variant rounded-lg overflow-hidden bg-white">
-                            <div className="bg-slate-50 border-b border-outline-variant px-3.5 py-2 flex justify-between items-center text-xs font-bold text-on-surface w-full">
-                              <span>{et}</span>
-                              <span className="text-slate-500 font-normal">({examQuestions.length} soru — Toplam: {maxTotal} puan)</span>
-                            </div>
-                            {renderTable(examQuestions)}
+                      {/* Charts Area */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="border border-outline-variant rounded-xl p-4 bg-white">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-sm font-bold text-on-surface">Ders Çıktısı (DÇ) Başarı %</h4>
+                            <span className="text-[11px] font-semibold text-slate-400">2 Basamaklı Hassasiyet</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ========================================================
-                    PAGE 3: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ)
-                   ======================================================== */}
-                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
-                  {/* Page Sub Header */}
-                  <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
-                    <div>
-                      <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
-                      <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
-                    </div>
-                    <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
-                      {analizData.modName}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-bold text-on-surface mb-3">🎓 Öğrenci Kazanım Özeti ({analizData.modName})</h4>
-                    <div className={`overflow-x-auto ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[500px] overflow-y-auto custom-scrollbar'}`}>
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead className={`bg-white z-10 border-b border-outline-variant ${isExportingPDF ? '' : 'sticky top-0 shadow-sm'}`}>
-                          <tr>
-                            <th className="px-3 py-2 font-bold text-on-surface">Öğrenci</th>
-                            {analizData.dcs.map(dc => (
-                              <th key={dc.id} className="px-2 py-2 text-center font-bold">{dc.code} (%)</th>
-                            ))}
-                            {analizData.pcs.map(pc => (
-                              <th key={pc.id} className="px-2 py-2 text-center font-bold bg-[#e8f5e9] text-[#006c49]">{pc.code} (%)</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {analizData.students.map(o => (
-                            <tr key={o.id} className="hover:bg-slate-50/50">
-                              <td className="px-3 py-1.5">
-                                <div className="font-bold text-on-surface font-mono">{o.number}</div>
-                                <div className="text-[10px] text-slate-500 font-semibold">{o.name}</div>
-                              </td>
-                              {analizData.dcs.map(dc => {
-                                const pct = analizData.studentDcSuccess[o.id]?.[dc.code] || 0;
-                                return (
-                                  <td key={dc.id} className={`px-2 py-1.5 text-center font-bold text-xs ${getColorByValue(pct)}`}>
-                                    %{pct.toFixed(2).replace('.', ',')}
-                                  </td>
-                                );
-                              })}
-                              {analizData.pcs.map(pc => {
-                                const pct = analizData.studentPcSuccess[o.id]?.[pc.code] || 0;
-                                return (
-                                  <td key={pc.id} className="px-2 py-1.5 text-center font-bold text-xs bg-[#f1f8e9] text-on-surface">
-                                    %{pct.toFixed(2).replace('.', ',')}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ========================================================
-                    PAGE 4: ÖĞRENCİ BAZLI BAŞARI ÖZETİ (SORU DETAYLARI)
-                   ======================================================== */}
-                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
-                  {/* Page Sub Header */}
-                  <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
-                    <div>
-                      <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
-                      <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
-                    </div>
-                    <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
-                      {analizData.modName}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-bold text-on-surface mb-3">🧑‍🎓 Öğrenci Bazlı Başarı Özeti ({analizData.modName})</h4>
-                    
-                    {analizData.isComboMode ? (
-                      /* KOMBİNASYON TABLOSU (Sınav ağırlıklı) */
-                      <div className={`overflow-x-auto ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[500px] overflow-y-auto custom-scrollbar'}`}>
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead className={`bg-white z-10 border-b border-outline-variant ${isExportingPDF ? '' : 'sticky top-0 shadow-sm'}`}>
-                            <tr>
-                              <th className="px-3 py-2 font-bold text-on-surface whitespace-nowrap">No</th>
-                              <th className="px-3 py-2 font-bold text-on-surface whitespace-nowrap">Ad Soyad</th>
-                              {analizData.reqExams.map(et => (
-                                <Fragment key={et}>
-                                  <th className="px-2 py-2 text-center font-bold whitespace-nowrap">{et} (100 üz.)</th>
-                                  <th className="px-2 py-2 text-center font-bold bg-slate-50 whitespace-nowrap">Etki (%{analizData.pctMap[et]})</th>
-                                </Fragment>
-                              ))}
-                              <th className="px-3 py-2 text-center font-bold bg-[#e5eeff] text-primary whitespace-nowrap">Ağırlıklı Not</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {(() => {
-                              let totalWeightedAvg = 0;
-                              const termSums = {};
-                              analizData.reqExams.forEach(et => { termSums[et] = { sum: 0, count: 0 }; });
-
-                              const rows = analizData.students.map(o => {
-                                let rowWeighted = 0;
-                                return (
-                                  <tr key={o.id} className="hover:bg-slate-50/50">
-                                    <td className="px-3 py-1.5 font-bold font-mono whitespace-nowrap">{o.number}</td>
-                                    <td className="px-3 py-1.5 font-semibold whitespace-nowrap">{o.name}</td>
-                                    {analizData.reqExams.map(et => {
-                                      const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
-                                      const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
-                                      let obtained = 0;
-                                      examQuestions.forEach(q => {
-                                        const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
-                                        obtained += getQuestionScore(q, grade);
-                                      });
-                                      const rawPercent = examMax > 0 ? (obtained / examMax) * 100 : 0;
-                                      const weightedVal = (rawPercent * analizData.pctMap[et]) / 100;
-                                      rowWeighted += weightedVal;
-
-                                      termSums[et].sum += rawPercent;
-                                      termSums[et].count++;
-
-                                      return (
-                                        <Fragment key={et}>
-                                          <td className={`px-2 py-1.5 text-center font-bold ${getColorByValue(rawPercent)}`}>
-                                            {rawPercent.toFixed(1)}
-                                          </td>
-                                          <td className="px-2 py-1.5 text-center font-semibold bg-slate-50/30 text-slate-500">
-                                            {weightedVal.toFixed(1)}
-                                          </td>
-                                        </Fragment>
-                                      );
-                                    })}
-                                    {(() => {
-                                      totalWeightedAvg += rowWeighted;
-                                      return (
-                                        <td className={`px-3 py-1.5 text-center font-bold text-white ${getBadgeColorByValue(rowWeighted)}`}>
-                                          {rowWeighted.toFixed(1)}
-                                        </td>
-                                      );
-                                    })()}
-                                  </tr>
-                                );
-                              });
-
-                              const avgWeighted = analizData.students.length > 0 ? totalWeightedAvg / analizData.students.length : 0;
-
-                              return (
-                                <>
-                                  {rows}
-                                  <tr className={`bg-slate-100 font-bold border-t border-outline-variant ${isExportingPDF ? '' : 'sticky bottom-0'}`}>
-                                    <td colSpan={2} className="px-3 py-2.5 text-right whitespace-nowrap">Sınıf Ortalaması:</td>
-                                    {analizData.reqExams.map(et => {
-                                      const avgRaw = termSums[et].count > 0 ? termSums[et].sum / termSums[et].count : 0;
-                                      const avgWeightedTerm = (avgRaw * analizData.pctMap[et]) / 100;
-                                      return (
-                                        <Fragment key={et}>
-                                          <td className="px-2 py-2.5 text-center text-on-surface">{avgRaw.toFixed(1)}</td>
-                                          <td className="px-2 py-2.5 text-center text-slate-500">{avgWeightedTerm.toFixed(1)}</td>
-                                        </Fragment>
-                                      );
-                                    })}
-                                    <td className={`px-3 py-2.5 text-center text-white ${getBadgeColorByValue(avgWeighted)}`}>
-                                      {avgWeighted.toFixed(1)}
-                                    </td>
-                                  </tr>
-                                </>
-                              );
-                            })()}
-                          </tbody>
-                        </table>
+                          <div className="relative h-[270px]">
+                            <canvas id="chartDC"></canvas>
+                          </div>
+                        </div>
+                        <div className="border border-outline-variant rounded-xl p-4 bg-white">
+                          <div className="flex justify-between items-center mb-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-on-surface">Program Çıktısı (PÇ) Sağlanma %</h4>
+                              <span className="text-[11px] font-semibold text-slate-400">PÇ-DÇ Ağırlıklı Dağılım</span>
+                            </div>
+                            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                              <button
+                                onClick={() => setPcChartType('bar')}
+                                className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${pcChartType === 'bar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                title="Sütun Grafiği (Daha Anlaşılır ve Net)"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">bar_chart</span>
+                                Sütun
+                              </button>
+                              <button
+                                onClick={() => setPcChartType('radar')}
+                                className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${pcChartType === 'radar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                title="Radar Grafiği"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">radar</span>
+                                Radar
+                              </button>
+                            </div>
+                          </div>
+                          <div className="relative h-[270px]">
+                            <canvas id="chartPC"></canvas>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      /* TEKİL SINAV TABLOSU (Soru bazlı detay) */
-                      (() => {
-                        const qCount = analizData.questions.length;
-                        const tableTextSize = isExportingPDF
-                          ? (qCount > 25 ? 'text-[7px]' : qCount > 18 ? 'text-[8px]' : qCount > 12 ? 'text-[9.5px]' : 'text-[11px]')
-                          : 'text-xs';
-                        const qCellPad = isExportingPDF
-                          ? (qCount > 25 ? 'px-0.5 py-1' : qCount > 18 ? 'px-1 py-1' : qCount > 12 ? 'px-1.5 py-1.5' : 'px-2 py-2')
-                          : 'px-2 py-2';
-                        const infoCellPad = isExportingPDF
-                          ? (qCount > 20 ? 'px-1 py-1 max-w-[80px]' : qCount > 12 ? 'px-1.5 py-1.5 max-w-[100px]' : 'px-3 py-2')
-                          : 'px-3 py-2';
 
-                        return (
-                          <div className={`overflow-x-auto w-full ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[500px] overflow-y-auto custom-scrollbar'}`}>
-                            <table className={`w-full text-left border-collapse table-auto ${tableTextSize}`}>
-                              <thead className={`bg-white z-10 border-b border-outline-variant ${isExportingPDF ? '' : 'sticky top-0 shadow-sm'}`}>
-                                <tr>
-                                  <th className={`${infoCellPad} font-bold text-on-surface whitespace-nowrap`}>No</th>
-                                  <th className={`${infoCellPad} font-bold text-on-surface whitespace-nowrap truncate`}>Ad Soyad</th>
-                                  {analizData.questions.map(q => (
-                                    <th key={q.id} className={`${qCellPad} text-center font-bold`} title={q.description}>
-                                      {q.code || `S${q.number}`}
-                                      <span className="block text-[8px] font-normal text-slate-500">({q.max_score}p)</span>
-                                    </th>
+                      {/* Outcome matrix details */}
+                      {analizData.pcs.length > 0 && analizData.dcs.length > 0 && (
+                        <div className="border border-outline-variant rounded-xl p-4 bg-white">
+                          <h4 className="text-xs font-bold text-[#825100] mb-2.5">🔗 Mevcut PÇ-DÇ Matris Değerleri</h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-outline-variant">
+                                  <th className="px-3 py-2 font-bold text-on-surface">DÇ / PÇ</th>
+                                  {analizData.pcs.map(pc => (
+                                    <th key={pc.id} className="px-2 py-2 text-center font-bold bg-[#e8f5e9] text-[#006c49]">{pc.code}</th>
                                   ))}
-                                  <th className={`${qCellPad} text-center font-bold whitespace-nowrap`}>Toplam</th>
-                                  <th className={`${qCellPad} text-center font-bold bg-[#e5eeff] text-primary whitespace-nowrap`}>Başarı %</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {(() => {
-                                  let totalObtainedAvg = 0;
-                                  let totalPercentAvg = 0;
-                                  const questionSums = {};
-                                  analizData.questions.forEach(q => { questionSums[q.id] = { sum: 0, count: 0 }; });
+                                {analizData.dcs.map(dc => (
+                                  <tr key={dc.id} className="hover:bg-slate-50/50">
+                                    <td className="px-3 py-1.5 font-bold text-on-surface">{dc.code}</td>
+                                    {analizData.pcs.map(pc => {
+                                      const entry = analizData.matrix.find(m => m.dc === dc.id && m.pc === pc.id);
+                                      const val = entry ? entry.level : 0;
+                                      return (
+                                        <td
+                                          key={pc.id}
+                                          className={`px-2 py-1.5 text-center font-bold ${val > 0 ? 'bg-[#d4edda] text-[#155724]' : 'text-slate-300'}`}
+                                        >
+                                          {val}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
 
-                                  const rows = analizData.students.map(o => {
-                                    let rowTotal = 0;
+                      {/* Page Footer */}
+                      <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                        <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                        <span>Sayfa 1 / {totalCoursePages}</span>
+                      </div>
+                    </div>
+
+                    {/* ========================================================
+                        PAGE 2: SINAV SORU TANIMLAMA BİLGİLERİ
+                       ======================================================== */}
+                    <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
+                      {/* Page Sub Header */}
+                      <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                        <div>
+                          <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
+                          <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
+                        </div>
+                        <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+                          {analizData.modName}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-bold text-on-surface mb-3">📝 Sınav Soru Tanımlama Bilgileri</h4>
+                        <div className={analizData.reqExams.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "w-full"}>
+                          {analizData.reqExams.map(et => {
+                            const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                            if (examQuestions.length === 0) return null;
+                            const maxTotal = examQuestions.reduce((s, q) => s + (q.max_score || 0), 0);
+                            const isSingleExam = analizData.reqExams.length === 1;
+                            const shouldSplit = isSingleExam && examQuestions.length > 8;
+
+                            const renderTable = (list) => (
+                              <table className="w-full text-left text-[11px] border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50/50 border-b border-slate-200 font-semibold text-slate-600">
+                                    <th className="px-2.5 py-1.5 text-center w-12">Kod</th>
+                                    <th className="px-2.5 py-1.5">Tür</th>
+                                    <th className="px-2.5 py-1.5 text-center">DÇ</th>
+                                    <th className="px-2.5 py-1.5 text-center w-16">Puan</th>
+                                    <th className="px-2.5 py-1.5 text-center w-16">Cevap</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {list.map(q => {
+                                    const qDcs = getQuestionDcCodes(q);
                                     return (
-                                      <tr key={o.id} className="hover:bg-slate-50/50">
-                                        <td className={`${infoCellPad} font-bold font-mono whitespace-nowrap`}>{o.number}</td>
-                                        <td className={`${infoCellPad} font-semibold whitespace-nowrap truncate`}>{o.name}</td>
-                                        {analizData.questions.map(q => {
-                                          const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
-                                          const score = getQuestionScore(q, grade);
-                                          rowTotal += score;
+                                      <tr key={q.id} className="hover:bg-slate-50/50">
+                                        <td className="px-2.5 py-1.5 font-bold text-center font-mono">{q.code || `S${q.number}`}</td>
+                                        <td className="px-2.5 py-1.5 text-slate-600 font-medium">{q.type}</td>
+                                        <td className="px-2.5 py-1.5 text-center">
+                                          {qDcs.map(code => (
+                                            <span key={code} className="inline-flex items-center justify-center bg-[#0058be]/10 text-[#0058be] px-1.5 py-0.5 rounded text-[10px] font-bold mx-0.5 leading-none">{code}</span>
+                                          ))}
+                                        </td>
+                                        <td className="px-2.5 py-1.5 font-bold text-center">{q.max_score}</td>
+                                        <td className="px-2.5 py-1.5 text-center text-[#006c49] font-bold">{q.answer || '—'}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            );
 
-                                          questionSums[q.id].sum += score;
-                                          questionSums[q.id].count++;
+                            if (shouldSplit) {
+                              const mid = Math.ceil(examQuestions.length / 2);
+                              const left = examQuestions.slice(0, mid);
+                              const right = examQuestions.slice(mid);
 
-                                          let cellBg = '';
-                                          let cellText = '—';
-                                          if (grade) {
-                                            if (score === q.max_score) {
-                                              cellBg = 'bg-[#d4edda] text-[#155724]';
-                                              if (q.type === 'Çoktan Seçmeli') {
-                                                const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
-                                                cellText = optionLetters[grade.score] || (q.answer || '✓');
-                                              } else {
-                                                cellText = q.type === 'Doğru/Yanlış' ? (q.answer || 'Doğru') : `${score}p`;
-                                              }
-                                            } else if (score > 0) {
-                                              cellBg = 'bg-[#fff3cd] text-[#856404]';
-                                              cellText = `${score}p`;
-                                            } else {
-                                              cellBg = 'bg-[#f8d7da] text-[#721c24]';
-                                              if (q.type === 'Çoktan Seçmeli') {
-                                                const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
-                                                cellText = optionLetters[grade.score] || 'X';
-                                              } else {
-                                                cellText = q.type === 'Doğru/Yanlış' ? 'Yanlış' : '0p';
-                                              }
-                                            }
-                                          }
+                              return (
+                                <div key={et} className="w-full border border-outline-variant rounded-lg overflow-hidden bg-white">
+                                  <div className="bg-slate-50 border-b border-outline-variant px-3.5 py-2 flex justify-between items-center text-xs font-bold text-on-surface w-full">
+                                    <span>{et}</span>
+                                    <span className="text-slate-500 font-normal">({examQuestions.length} soru — Toplam: {maxTotal} puan)</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-outline-variant">
+                                    <div>{renderTable(left)}</div>
+                                    <div>{renderTable(right)}</div>
+                                  </div>
+                                </div>
+                              );
+                            }
 
-                                          return (
-                                            <td key={q.id} className={`${qCellPad} text-center font-bold ${cellBg}`}>
-                                              {cellText}
+                            return (
+                              <div key={et} className="w-full border border-outline-variant rounded-lg overflow-hidden bg-white">
+                                <div className="bg-slate-50 border-b border-outline-variant px-3.5 py-2 flex justify-between items-center text-xs font-bold text-on-surface w-full">
+                                  <span>{et}</span>
+                                  <span className="text-slate-500 font-normal">({examQuestions.length} soru — Toplam: {maxTotal} puan)</span>
+                                </div>
+                                {renderTable(examQuestions)}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Page Footer */}
+                      <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                        <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                        <span>Sayfa 2 / {totalCoursePages}</span>
+                      </div>
+                    </div>
+
+                    {/* ========================================================
+                        PAGE 3+: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ) [30 ÖĞRENCİ / SAYFA]
+                       ======================================================== */}
+                    {studentChunks.map((chunk, chunkIdx) => {
+                      const pageNum = 3 + chunkIdx;
+                      return (
+                        <div key={`kazanim-page-${chunkIdx}`} className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
+                          {/* Page Sub Header */}
+                          <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                            <div>
+                              <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
+                              <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
+                            </div>
+                            <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+                              {analizData.modName}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="text-sm font-bold text-on-surface">
+                                🎓 Öğrenci Kazanım Özeti ({analizData.modName})
+                              </h4>
+                              {studentChunks.length > 1 && (
+                                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                                  Öğrenci {chunkIdx * STUDENTS_PER_PAGE + 1} - {Math.min((chunkIdx + 1) * STUDENTS_PER_PAGE, analizData.students.length)} / {analizData.students.length}
+                                </span>
+                              )}
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left border-collapse text-xs">
+                                <thead className="bg-white z-10 border-b border-outline-variant">
+                                  <tr>
+                                    <th className="px-3 py-2 font-bold text-on-surface">Öğrenci</th>
+                                    {analizData.dcs.map(dc => (
+                                      <th key={dc.id} className="px-2 py-2 text-center font-bold">{dc.code} (%)</th>
+                                    ))}
+                                    {analizData.pcs.map(pc => (
+                                      <th key={pc.id} className="px-2 py-2 text-center font-bold bg-[#e8f5e9] text-[#006c49]">{pc.code} (%)</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {chunk.map(o => (
+                                    <tr key={o.id} className="hover:bg-slate-50/50">
+                                      <td className="px-3 py-1.5">
+                                        <div className="font-bold text-on-surface font-mono">{o.number}</div>
+                                        <div className="text-[10px] text-slate-500 font-semibold">{o.name}</div>
+                                      </td>
+                                      {analizData.dcs.map(dc => {
+                                        const pct = analizData.studentDcSuccess[o.id]?.[dc.code] || 0;
+                                        return (
+                                          <td key={dc.id} className={`px-2 py-1.5 text-center font-bold text-xs ${getColorByValue(pct)}`}>
+                                            %{pct.toFixed(2).replace('.', ',')}
+                                          </td>
+                                        );
+                                      })}
+                                      {analizData.pcs.map(pc => {
+                                        const pct = analizData.studentPcSuccess[o.id]?.[pc.code] || 0;
+                                        return (
+                                          <td key={pc.id} className="px-2 py-1.5 text-center font-bold text-xs bg-[#f1f8e9] text-on-surface">
+                                            %{pct.toFixed(2).replace('.', ',')}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Page Footer */}
+                          <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                            <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                            <span>Sayfa {pageNum} / {totalCoursePages}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* ========================================================
+                        PAGE 4+: ÖĞRENCİ BAZLI BAŞARI ÖZETİ [30 ÖĞRENCİ / SAYFA]
+                       ======================================================== */}
+                    {studentChunks.map((chunk, chunkIdx) => {
+                      const pageNum = 3 + numKazanimPages + chunkIdx;
+                      const isLastChunk = chunkIdx === studentChunks.length - 1;
+
+                      return (
+                        <div key={`basari-page-${chunkIdx}`} className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
+                          {/* Page Sub Header */}
+                          <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                            <div>
+                              <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
+                              <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
+                            </div>
+                            <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+                              {analizData.modName}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="text-sm font-bold text-on-surface">🧑‍🎓 Öğrenci Bazlı Başarı Özeti ({analizData.modName})</h4>
+                              {studentChunks.length > 1 && (
+                                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                                  Öğrenci {chunkIdx * STUDENTS_PER_PAGE + 1} - {Math.min((chunkIdx + 1) * STUDENTS_PER_PAGE, analizData.students.length)} / {analizData.students.length}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {analizData.isComboMode ? (
+                              /* KOMBİNASYON TABLOSU (Sınav ağırlıklı) */
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-xs">
+                                  <thead className="bg-white z-10 border-b border-outline-variant">
+                                    <tr>
+                                      <th className="px-3 py-2 font-bold text-on-surface whitespace-nowrap">No</th>
+                                      <th className="px-3 py-2 font-bold text-on-surface whitespace-nowrap">Ad Soyad</th>
+                                      {analizData.reqExams.map(et => (
+                                        <Fragment key={et}>
+                                          <th className="px-2 py-2 text-center font-bold whitespace-nowrap">{et} (100 üz.)</th>
+                                          <th className="px-2 py-2 text-center font-bold bg-slate-50 whitespace-nowrap">Etki (%{analizData.pctMap[et]})</th>
+                                        </Fragment>
+                                      ))}
+                                      <th className="px-3 py-2 text-center font-bold bg-[#e5eeff] text-primary whitespace-nowrap">Ağırlıklı Not</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {(() => {
+                                      const rows = chunk.map(o => {
+                                        let rowWeighted = 0;
+                                        return (
+                                          <tr key={o.id} className="hover:bg-slate-50/50">
+                                            <td className="px-3 py-1.5 font-bold font-mono whitespace-nowrap">{o.number}</td>
+                                            <td className="px-3 py-1.5 font-semibold whitespace-nowrap">{o.name}</td>
+                                            {analizData.reqExams.map(et => {
+                                              const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                                              const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
+                                              let obtained = 0;
+                                              examQuestions.forEach(q => {
+                                                const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
+                                                obtained += getQuestionScore(q, grade);
+                                              });
+                                              const rawPercent = examMax > 0 ? (obtained / examMax) * 100 : 0;
+                                              const weightedVal = (rawPercent * analizData.pctMap[et]) / 100;
+                                              rowWeighted += weightedVal;
+
+                                              return (
+                                                <Fragment key={et}>
+                                                  <td className={`px-2 py-1.5 text-center font-bold ${getColorByValue(rawPercent)}`}>
+                                                    {rawPercent.toFixed(1)}
+                                                  </td>
+                                                  <td className="px-2 py-1.5 text-center font-semibold bg-slate-50/30 text-slate-500">
+                                                    {weightedVal.toFixed(1)}
+                                                  </td>
+                                                </Fragment>
+                                              );
+                                            })}
+                                            <td className={`px-3 py-1.5 text-center font-bold text-white ${getBadgeColorByValue(rowWeighted)}`}>
+                                              {rowWeighted.toFixed(1)}
                                             </td>
-                                          );
-                                        })}
+                                          </tr>
+                                        );
+                                      });
+
+                                      if (!isLastChunk) return rows;
+
+                                      // Sınıf geneli ortalama hesaplama
+                                      let totalWeightedAvg = 0;
+                                      const termSums = {};
+                                      analizData.reqExams.forEach(et => { termSums[et] = { sum: 0, count: 0 }; });
+
+                                      analizData.students.forEach(o => {
+                                        let rW = 0;
+                                        analizData.reqExams.forEach(et => {
+                                          const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                                          const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
+                                          let obtained = 0;
+                                          examQuestions.forEach(q => {
+                                            const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
+                                            obtained += getQuestionScore(q, grade);
+                                          });
+                                          const rawPercent = examMax > 0 ? (obtained / examMax) * 100 : 0;
+                                          rW += (rawPercent * analizData.pctMap[et]) / 100;
+                                          termSums[et].sum += rawPercent;
+                                          termSums[et].count++;
+                                        });
+                                        totalWeightedAvg += rW;
+                                      });
+
+                                      const avgWeighted = analizData.students.length > 0 ? totalWeightedAvg / analizData.students.length : 0;
+
+                                      return (
+                                        <>
+                                          {rows}
+                                          <tr className="bg-slate-100 font-bold border-t border-outline-variant">
+                                            <td colSpan={2} className="px-3 py-2.5 text-right whitespace-nowrap">Sınıf Ortalaması:</td>
+                                            {analizData.reqExams.map(et => {
+                                              const avgRaw = termSums[et].count > 0 ? termSums[et].sum / termSums[et].count : 0;
+                                              const avgWeightedTerm = (avgRaw * analizData.pctMap[et]) / 100;
+                                              return (
+                                                <Fragment key={et}>
+                                                  <td className="px-2 py-2.5 text-center text-on-surface">{avgRaw.toFixed(1)}</td>
+                                                  <td className="px-2 py-2.5 text-center text-slate-500">{avgWeightedTerm.toFixed(1)}</td>
+                                                </Fragment>
+                                              );
+                                            })}
+                                            <td className={`px-3 py-2.5 text-center text-white ${getBadgeColorByValue(avgWeighted)}`}>
+                                              {avgWeighted.toFixed(1)}
+                                            </td>
+                                          </tr>
+                                        </>
+                                      );
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              /* TEKİL SINAV TABLOSU (Soru bazlı detay) */
+                              (() => {
+                                const qCount = analizData.questions.length;
+                                const tableTextSize = isExportingPDF
+                                  ? (qCount > 25 ? 'text-[7px]' : qCount > 18 ? 'text-[8px]' : qCount > 12 ? 'text-[9.5px]' : 'text-[11px]')
+                                  : 'text-xs';
+                                const qCellPad = isExportingPDF
+                                  ? (qCount > 25 ? 'px-0.5 py-1' : qCount > 18 ? 'px-1 py-1' : qCount > 12 ? 'px-1.5 py-1.5' : 'px-2 py-2')
+                                  : 'px-2 py-2';
+                                const infoCellPad = isExportingPDF
+                                  ? (qCount > 20 ? 'px-1 py-1 max-w-[80px]' : qCount > 12 ? 'px-1.5 py-1.5 max-w-[100px]' : 'px-3 py-2')
+                                  : 'px-3 py-2';
+
+                                return (
+                                  <div className="overflow-x-auto w-full">
+                                    <table className={`w-full text-left border-collapse table-auto ${tableTextSize}`}>
+                                      <thead className="bg-white z-10 border-b border-outline-variant">
+                                        <tr>
+                                          <th className={`${infoCellPad} font-bold text-on-surface whitespace-nowrap`}>No</th>
+                                          <th className={`${infoCellPad} font-bold text-on-surface whitespace-nowrap truncate`}>Ad Soyad</th>
+                                          {analizData.questions.map(q => (
+                                            <th key={q.id} className={`${qCellPad} text-center font-bold`} title={q.description}>
+                                              {q.code || `S${q.number}`}
+                                              <span className="block text-[8px] font-normal text-slate-500">({q.max_score}p)</span>
+                                            </th>
+                                          ))}
+                                          <th className={`${qCellPad} text-center font-bold whitespace-nowrap`}>Toplam</th>
+                                          <th className={`${qCellPad} text-center font-bold bg-[#e5eeff] text-primary whitespace-nowrap`}>Başarı %</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
                                         {(() => {
-                                          totalObtainedAvg += rowTotal;
-                                          const rowPct = analizData.modMaxScore > 0 ? (rowTotal / analizData.modMaxScore) * 100 : 0;
-                                          totalPercentAvg += rowPct;
+                                          const rows = chunk.map(o => {
+                                            let rowTotal = 0;
+                                            return (
+                                              <tr key={o.id} className="hover:bg-slate-50/50">
+                                                <td className={`${infoCellPad} font-bold font-mono whitespace-nowrap`}>{o.number}</td>
+                                                <td className={`${infoCellPad} font-semibold whitespace-nowrap truncate`}>{o.name}</td>
+                                                {analizData.questions.map(q => {
+                                                  const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
+                                                  const score = getQuestionScore(q, grade);
+                                                  rowTotal += score;
+
+                                                  let cellBg = '';
+                                                  let cellText = '—';
+                                                  if (grade) {
+                                                    if (score === q.max_score) {
+                                                      cellBg = 'bg-[#d4edda] text-[#155724]';
+                                                      if (q.type === 'Çoktan Seçmeli') {
+                                                        const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
+                                                        cellText = optionLetters[grade.score] || (q.answer || '✓');
+                                                      } else {
+                                                        cellText = q.type === 'Doğru/Yanlış' ? (q.answer || 'Doğru') : `${score}p`;
+                                                      }
+                                                    } else if (score > 0) {
+                                                      cellBg = 'bg-[#fff3cd] text-[#856404]';
+                                                      cellText = `${score}p`;
+                                                    } else {
+                                                      cellBg = 'bg-[#f8d7da] text-[#721c24]';
+                                                      if (q.type === 'Çoktan Seçmeli') {
+                                                        const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
+                                                        cellText = optionLetters[grade.score] || 'X';
+                                                      } else {
+                                                        cellText = q.type === 'Doğru/Yanlış' ? 'Yanlış' : '0p';
+                                                      }
+                                                    }
+                                                  }
+
+                                                  return (
+                                                    <td key={q.id} className={`${qCellPad} text-center font-bold ${cellBg}`}>
+                                                      {cellText}
+                                                    </td>
+                                                  );
+                                                })}
+                                                {(() => {
+                                                  const rowPct = analizData.modMaxScore > 0 ? (rowTotal / analizData.modMaxScore) * 100 : 0;
+                                                  return (
+                                                    <>
+                                                      <td className={`${qCellPad} text-center font-bold whitespace-nowrap`}>
+                                                        {rowTotal} <span className="text-slate-400 font-normal">/{analizData.modMaxScore}</span>
+                                                      </td>
+                                                      <td className={`${qCellPad} text-center font-bold text-white whitespace-nowrap ${getBadgeColorByValue(rowPct)}`}>
+                                                        {rowPct.toFixed(1)}%
+                                                      </td>
+                                                    </>
+                                                  );
+                                                })()}
+                                              </tr>
+                                            );
+                                          });
+
+                                          if (!isLastChunk) return rows;
+
+                                          // Sınıf geneli ortalama hesaplama
+                                          let totalObtainedAvg = 0;
+                                          let totalPercentAvg = 0;
+                                          const questionSums = {};
+                                          analizData.questions.forEach(q => { questionSums[q.id] = { sum: 0, count: 0 }; });
+
+                                          analizData.students.forEach(o => {
+                                            let rTot = 0;
+                                            analizData.questions.forEach(q => {
+                                              const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
+                                              const score = getQuestionScore(q, grade);
+                                              rTot += score;
+                                              questionSums[q.id].sum += score;
+                                              questionSums[q.id].count++;
+                                            });
+                                            totalObtainedAvg += rTot;
+                                            const rPct = analizData.modMaxScore > 0 ? (rTot / analizData.modMaxScore) * 100 : 0;
+                                            totalPercentAvg += rPct;
+                                          });
+
+                                          const avgObtained = analizData.students.length > 0 ? totalObtainedAvg / analizData.students.length : 0;
+                                          const avgPct = analizData.students.length > 0 ? totalPercentAvg / analizData.students.length : 0;
 
                                           return (
                                             <>
-                                              <td className={`${qCellPad} text-center font-bold whitespace-nowrap`}>
-                                                {rowTotal} <span className="text-slate-400 font-normal">/{analizData.modMaxScore}</span>
-                                              </td>
-                                              <td className={`${qCellPad} text-center font-bold text-white whitespace-nowrap ${getBadgeColorByValue(rowPct)}`}>
-                                                {rowPct.toFixed(1)}%
-                                              </td>
+                                              {rows}
+                                              <tr className="bg-slate-100 font-bold border-t border-outline-variant">
+                                                <td colSpan={2} className={`${infoCellPad} text-right whitespace-nowrap`}>Sınıf Ortalaması:</td>
+                                                {analizData.questions.map(q => {
+                                                  const avgQ = questionSums[q.id].count > 0 ? questionSums[q.id].sum / questionSums[q.id].count : 0;
+                                                  return (
+                                                    <td key={q.id} className={`${qCellPad} text-center text-on-surface`}>{avgQ.toFixed(1)}</td>
+                                                  );
+                                                })}
+                                                <td className={`${qCellPad} text-center text-on-surface whitespace-nowrap`}>
+                                                  {avgObtained.toFixed(1)} <span className="text-slate-400 font-normal">/{analizData.modMaxScore}</span>
+                                                </td>
+                                                <td className={`${qCellPad} text-center text-white whitespace-nowrap ${getBadgeColorByValue(avgPct)}`}>
+                                                  {avgPct.toFixed(1)}%
+                                                </td>
+                                              </tr>
                                             </>
                                           );
                                         })()}
-                                      </tr>
-                                    );
-                                  });
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                );
+                              })()
+                            )}
+                          </div>
 
-                                  const avgObtained = analizData.students.length > 0 ? totalObtainedAvg / analizData.students.length : 0;
-                                  const avgPct = analizData.students.length > 0 ? totalPercentAvg / analizData.students.length : 0;
+                          {/* Page Footer */}
+                          <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                            <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                            <span>Sayfa {pageNum} / {totalCoursePages}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
 
-                                  return (
-                                    <>
-                                      {rows}
-                                      <tr className={`bg-slate-100 font-bold border-t border-outline-variant ${isExportingPDF ? '' : 'sticky bottom-0'}`}>
-                                        <td colSpan={2} className={`${infoCellPad} text-right whitespace-nowrap`}>Sınıf Ortalaması:</td>
-                                        {analizData.questions.map(q => {
-                                          const avgQ = questionSums[q.id].count > 0 ? questionSums[q.id].sum / questionSums[q.id].count : 0;
+                    {/* ========================================================
+                        PAGE LAST: SORU İSTATİSTİKLERİ, BLOOM ZORLUK & UÇ DEĞERLER
+                       ======================================================== */}
+                    <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-5">
+                      {/* Page Sub Header */}
+                      <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                        <div>
+                          <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
+                          <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
+                        </div>
+                        <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+                          {analizData.modName}
+                        </span>
+                      </div>
+
+                      {/* Soru Bazlı Başarı Özeti */}
+                      <div className="grid grid-cols-1 gap-4">
+                        {analizData.isComboMode ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {analizData.reqExams.map(et => {
+                              const examStats = analizData.questionStats.filter(q => q.id && q.code && q.success !== undefined && q.type && q.testCount > 0);
+                              const list = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                              if (list.length === 0) return null;
+
+                              return (
+                                <div key={et} className="border border-outline-variant rounded-xl p-4 bg-white space-y-3">
+                                  <h4 className="text-xs font-bold text-primary">📊 {et} Soru Başarı Özeti</h4>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-[11px] border-collapse">
+                                      <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-100 font-bold">
+                                          <th className="px-2 py-1.5">Kod</th>
+                                          <th className="px-2 py-1.5">Tür</th>
+                                          <th className="px-2 py-1.5 text-center">Anahtar</th>
+                                          <th className="px-2 py-1.5 text-center">Başarı</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {list.map(q => {
+                                          const st = examStats.find(s => s.id === q.id) || { success: 0 };
                                           return (
-                                            <td key={q.id} className={`${qCellPad} text-center text-on-surface`}>{avgQ.toFixed(1)}</td>
+                                            <tr key={q.id}>
+                                              <td className="px-2 py-1.5 font-bold font-mono">{q.code || `S${q.number}`}</td>
+                                              <td className="px-2 py-1.5 text-slate-500 font-medium">{q.type}</td>
+                                              <td className="px-2 py-1.5 text-center font-bold text-[#006c49]">{q.answer || '—'}</td>
+                                              <td className={`px-2 py-1.5 text-center font-bold ${getColorByValue(st.success)}`}>
+                                                %{st.success.toFixed(1)}
+                                              </td>
+                                            </tr>
                                           );
                                         })}
-                                        <td className={`${qCellPad} text-center text-on-surface whitespace-nowrap`}>
-                                          {avgObtained.toFixed(1)} <span className="text-slate-400 font-normal">/{analizData.modMaxScore}</span>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="border border-outline-variant rounded-xl p-4 bg-white space-y-3">
+                            <h4 className="text-xs font-bold text-primary">📊 Soru Bazlı Başarı Özeti ({analizData.questionStats.length} soru)</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-100 font-bold">
+                                    <th className="px-3 py-2">Kod</th>
+                                    <th className="px-3 py-2">Tür</th>
+                                    <th className="px-3 py-2 text-center">Cevap Anahtarı</th>
+                                    <th className="px-3 py-2 text-center">Başarı Oranı</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {analizData.questionStats.map(q => (
+                                    <tr key={q.id} className="hover:bg-slate-50/50">
+                                      <td className="px-3 py-1.5 font-bold font-mono text-primary">{q.code}</td>
+                                      <td className="px-3 py-1.5 text-slate-500 font-medium">{q.type}</td>
+                                      <td className="px-3 py-1.5 text-center font-bold text-[#006c49]">{q.answer || '—'}</td>
+                                      <td className={`px-3 py-1.5 text-center font-bold ${getColorByValue(q.success)}`}>
+                                        %{q.success.toFixed(2).replace('.', ',')}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bloom Zorluk Seviyesi ve Analiz Kartı */}
+                      {analizData.questions.length > 0 && (
+                        <>
+                          <div className="border border-outline-variant rounded-xl p-4 bg-white space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant pb-2.5">
+                              <div>
+                                <h4 className="text-xs font-bold text-on-surface">🧠 Soru Zorluk Analizi (Sınav Karakteristiği)</h4>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Soru başarı oranlarına göre zorluk sınıflandırması</p>
+                              </div>
+                              <span className="text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full self-start sm:self-auto">
+                                Toplam: {analizData.questions.length} Soru
+                              </span>
+                            </div>
+
+                            {(() => {
+                              const total = analizData.questions.length;
+                              const hardPct = total > 0 ? Math.round((analizData.hardQuestions.length / total) * 100) : 0;
+                              const mediumPct = total > 0 ? Math.round((analizData.mediumQuestions.length / total) * 100) : 0;
+                              const easyPct = total > 0 ? Math.round((analizData.easyQuestions.length / total) * 100) : 0;
+
+                              const getBloomEmoji = (actual, target) => {
+                                const diff = Math.abs(actual - target);
+                                if (diff <= 5) return '🎯';
+                                if (diff <= 15) return '👌';
+                                return actual > target ? '📈' : '📉';
+                              };
+
+                              return (
+                                <div className="overflow-x-auto border border-outline-variant rounded-lg">
+                                  <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                      <tr className="bg-slate-50 text-[11px] font-bold border-b border-outline-variant">
+                                        <th className="px-3 py-2 text-[#ba1a1a]">🔴 Zor Sorular (&lt;%50 Başarı)</th>
+                                        <th className="px-3 py-2 text-[#825100]">🟡 Orta Sorular (%50-%70 Başarı)</th>
+                                        <th className="px-3 py-2 text-[#006c49]">🟢 Kolay Sorular (&gt;%70 Başarı)</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      <tr>
+                                        <td className="px-3 py-2 align-top">
+                                          {analizData.hardQuestions.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                              {analizData.hardQuestions.map(q => (
+                                                <span key={q.id} className="bg-red-50 text-[#ba1a1a] border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono">
+                                                  {q.code || `S${q.number}`} (%{q.success?.toFixed(0) || 0})
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : '—'}
                                         </td>
-                                        <td className={`${qCellPad} text-center text-white whitespace-nowrap ${getBadgeColorByValue(avgPct)}`}>
-                                          {avgPct.toFixed(1)}%
+                                        <td className="px-3 py-2 align-top">
+                                          {analizData.mediumQuestions.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                              {analizData.mediumQuestions.map(q => (
+                                                <span key={q.id} className="bg-amber-50 text-[#825100] border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono">
+                                                  {q.code || `S${q.number}`} (%{q.success?.toFixed(0) || 0})
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : '—'}
+                                        </td>
+                                        <td className="px-3 py-2 align-top">
+                                          {analizData.easyQuestions.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1">
+                                              {analizData.easyQuestions.map(q => (
+                                                <span key={q.id} className="bg-emerald-50 text-[#006c49] border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-bold font-mono">
+                                                  {q.code || `S${q.number}`} (%{q.success?.toFixed(0) || 0})
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : '—'}
                                         </td>
                                       </tr>
-                                    </>
-                                  );
-                                })()}
+                                      <tr className="border-t border-outline-variant bg-slate-50 font-bold text-[11px]">
+                                        <td className="px-3 py-1.5 text-[#ba1a1a]">{getBloomEmoji(hardPct, 20)} {hardPct}% ({analizData.hardQuestions.length}/{total})</td>
+                                        <td className="px-3 py-1.5 text-[#856404]">{getBloomEmoji(mediumPct, 60)} {mediumPct}% ({analizData.mediumQuestions.length}/{total})</td>
+                                        <td className="px-3 py-1.5 text-[#155724]">{getBloomEmoji(easyPct, 20)} {easyPct}% ({analizData.easyQuestions.length}/{total})</td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Student extremes */}
+                      {(() => {
+                        let studentGradesList = [];
+                        analizData.students.forEach(o => {
+                          let studentObtained = 0;
+                          let studentMax = 0;
+                          
+                          analizData.questions.forEach(q => {
+                            const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
+                            studentObtained += getQuestionScore(q, grade);
+                            studentMax += q.max_score;
+                          });
+                          
+                          if (analizData.isComboMode) {
+                            let rowWeighted = 0;
+                            analizData.reqExams.forEach(et => {
+                              const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                              const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
+                              let examObtained = 0;
+                              examQuestions.forEach(q => {
+                                const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
+                                examObtained += getQuestionScore(q, grade);
+                              });
+                              const rawPercent = examMax > 0 ? (examObtained / examMax) * 100 : 0;
+                              rowWeighted += (rawPercent * analizData.pctMap[et]) / 100;
+                            });
+                            studentGradesList.push({
+                              number: o.number,
+                              name: o.name,
+                              value: rowWeighted,
+                              label: `${rowWeighted.toFixed(1)} (ağ.not)`
+                            });
+                          } else {
+                            studentGradesList.push({
+                              number: o.number,
+                              name: o.name,
+                              value: studentObtained,
+                              label: `${studentObtained}p / ${studentMax}p`
+                            });
+                          }
+                        });
+
+                        if (studentGradesList.length === 0) return null;
+
+                        studentGradesList.sort((a, b) => a.value - b.value);
+                        const lowestStudents = studentGradesList.slice(0, 3);
+                        const highestStudents = [...studentGradesList].reverse().slice(0, 3);
+
+                        // Median students
+                        const medianIndex = Math.floor(studentGradesList.length / 2);
+                        const startMedian = Math.max(0, studentGradesList.length >= 3 ? medianIndex - 1 : 0);
+                        const medianStudents = studentGradesList.slice(startMedian, startMedian + 3);
+
+                        const renderExtremesTable = (list, title, color) => (
+                          <div className="border border-outline-variant rounded-xl p-3.5 bg-white flex-1 min-w-[220px]">
+                            <h4 className={`text-xs font-bold mb-2 ${color}`}>{title}</h4>
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-slate-100">
+                                  <th className="px-2 py-1 font-bold">No</th>
+                                  <th className="px-2 py-1 font-bold">Öğrenci</th>
+                                  <th className="px-2 py-1 text-center font-bold">Değer</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {list.map(s => (
+                                  <tr key={s.number}>
+                                    <td className="px-2 py-1 font-bold font-mono text-[11px]">{s.number}</td>
+                                    <td className="px-2 py-1 text-slate-500 font-semibold text-[11px]">{s.name}</td>
+                                    <td className={`px-2 py-1 text-center font-bold text-[11px] ${color}`}>{s.label}</td>
+                                  </tr>
+                                ))}
                               </tbody>
                             </table>
                           </div>
                         );
-                      })()
-                    )}
-                  </div>
-                </div>
 
-                {/* ========================================================
-                    PAGE 5: SORU İSTATİSTİKLERİ, BLOOM ZORLUK & UÇ DEĞERLER
-                   ======================================================== */}
-                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-5">
-                  {/* Page Sub Header */}
-                  <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
-                    <div>
-                      <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
-                      <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
-                    </div>
-                    <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
-                      {analizData.modName}
-                    </span>
-                  </div>
-
-                  {/* Soru Bazlı Başarı Özeti */}
-                  <div className="grid grid-cols-1 gap-4">
-                    {analizData.isComboMode ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {analizData.reqExams.map(et => {
-                          const examStats = analizData.questionStats.filter(q => q.id && q.code && q.success !== undefined && q.type && q.testCount > 0);
-                          const list = analizData.questions.filter(q => q.expand?.exam?.type === et);
-                          if (list.length === 0) return null;
-
-                          return (
-                            <div key={et} className="border border-outline-variant rounded-xl p-4 bg-white space-y-3">
-                              <h4 className="text-xs font-bold text-primary">📊 {et} Soru Başarı Özeti</h4>
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left text-[11px] border-collapse">
-                                  <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-100 font-bold">
-                                      <th className="px-2 py-1.5">Kod</th>
-                                      <th className="px-2 py-1.5">Tür</th>
-                                      <th className="px-2 py-1.5 text-center">Anahtar</th>
-                                      <th className="px-2 py-1.5 text-center">Başarı</th>
-                                      <th className="px-2 py-1.5">Yanıt Dağılımı</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100">
-                                    {list.map(s => {
-                                      const stat = analizData.questionStats.find(st => st.id === s.id);
-                                      const success = stat ? stat.success : 0;
-                                      const ansCounts = stat ? stat.answerCounts : {};
-                                      
-                                      return (
-                                        <tr key={s.id}>
-                                          <td className="px-2 py-1.5 font-bold">{s.code || `S${s.number}`}</td>
-                                          <td className="px-2 py-1.5 text-slate-500">{s.type}</td>
-                                          <td className="px-2 py-1.5 text-center font-bold text-[#0058be]">{s.answer || '—'}</td>
-                                          <td className="px-2 py-1.5 text-center align-middle">
-                                            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded font-bold text-white leading-none ${getBadgeColorByValue(success)}`}>
-                                              {success.toFixed(1)}%
-                                            </span>
-                                          </td>
-                                          <td className="px-2 py-1.5">
-                                            {s.type === 'Çoktan Seçmeli' || s.type === 'Doğru/Yanlış' ? (
-                                              <div className="flex flex-wrap gap-1">
-                                                {Object.entries(ansCounts).map(([ans, count]) => {
-                                                  const isCorrect = ans.toUpperCase() === (s.answer || '').toUpperCase();
-                                                  return (
-                                                    <span key={ans} className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-bold leading-none ${isCorrect ? 'bg-[#006c49] text-white' : 'bg-slate-100 text-slate-600'}`}>
-                                                      {ans}: {count}
-                                                    </span>
-                                                  );
-                                                })}
-                                              </div>
-                                            ) : (
-                                              <span className="text-slate-400">Ort: {stat ? (stat.totalScore / (stat.testCount || 1)).toFixed(1) : 0}p / {s.max_score}p</span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="border border-outline-variant rounded-xl p-4 bg-white space-y-2.5">
-                        <h4 className="text-xs font-bold text-on-surface">📊 Soru Bazlı Başarı Özeti ({analizData.modName})</h4>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50 border-b border-outline-variant font-bold">
-                                <th className="px-3 py-1.5">Kod</th>
-                                <th className="px-3 py-1.5">Tür</th>
-                                <th className="px-3 py-1.5 text-center">Anahtar</th>
-                                <th className="px-3 py-1.5 text-center">Başarı</th>
-                                <th className="px-3 py-1.5">Yanıt Dağılımı (Sınıf Geneli Soru Yanıtları)</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {analizData.questionStats.map(s => (
-                                <tr key={s.id}>
-                                  <td className="px-3 py-1.5 font-bold">{s.code}</td>
-                                  <td className="px-3 py-1.5 text-slate-500">{s.type}</td>
-                                  <td className="px-3 py-1.5 text-center font-bold text-primary">{s.answer || '—'}</td>
-                                  <td className="px-3 py-1.5 text-center align-middle">
-                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded font-bold text-white leading-none ${getBadgeColorByValue(s.success)}`}>
-                                      {s.success.toFixed(1)}%
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-1.5">
-                                    {s.type === 'Çoktan Seçmeli' || s.type === 'Doğru/Yanlış' ? (
-                                      <div className="flex flex-wrap gap-1">
-                                        {Object.entries(s.answerCounts).map(([ans, count]) => {
-                                          const isCorrect = ans.toUpperCase() === (s.answer || '').toUpperCase();
-                                          return (
-                                            <span key={ans} className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold leading-none ${isCorrect ? 'bg-[#006c49] text-white' : 'bg-slate-100 text-slate-600'}`}>
-                                              {ans}: {count}
-                                            </span>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-500 font-semibold">Ortalama: {(s.totalScore / (s.testCount || 1)).toFixed(1)}p / {s.max_score}p</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Extremes & Bloom */}
-                  {!analizData.isComboMode && (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                          <h4 className="text-xs font-bold text-[#ba1a1a] mb-2">📉 En Çok Yanlış / Eksik Yapılan Sorular</h4>
-                          <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="px-2 py-1.5 font-bold">Soru</th>
-                                <th className="px-2 py-1.5 font-bold">Açıklama</th>
-                                <th className="px-2 py-1.5 text-center font-bold">Başarı</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {[...analizData.questionStats].sort((a, b) => a.success - b.success).slice(0, 3).map(s => (
-                                <tr key={s.id}>
-                                  <td className="px-2 py-1.5 font-bold">{s.code}</td>
-                                  <td className="px-2 py-1.5 text-slate-500 truncate max-w-[200px]" title={s.description}>{s.description}</td>
-                                  <td className="px-2 py-1.5 text-center font-bold text-[#ba1a1a]">{s.success.toFixed(1)}%</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                          <h4 className="text-xs font-bold text-[#006c49] mb-2">📈 En Çok Doğru / Tam Puan Alınan Sorular</h4>
-                          <table className="w-full text-left text-xs border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="px-2 py-1.5 font-bold">Soru</th>
-                                <th className="px-2 py-1.5 font-bold">Açıklama</th>
-                                <th className="px-2 py-1.5 text-center font-bold">Başarı</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {[...analizData.questionStats].sort((a, b) => b.success - a.success).slice(0, 3).map(s => (
-                                <tr key={s.id}>
-                                  <td className="px-2 py-1.5 font-bold">{s.code}</td>
-                                  <td className="px-2 py-1.5 text-slate-500 truncate max-w-[200px]" title={s.description}>{s.description}</td>
-                                  <td className="px-2 py-1.5 text-center font-bold text-[#006c49]">{s.success.toFixed(1)}%</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* Bloom taxonomy zorluk analizi */}
-                      <div className="border border-outline-variant rounded-xl p-4 bg-white space-y-2">
-                        <div className="flex justify-between items-center">
-                          <h4 className="text-xs font-bold text-on-surface">🎯 Soru Zorluk Analizi — Bloom Taksonomisi</h4>
-                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-                            <span>Hedef:</span>
-                            <span className="bg-[#e8f5e9] text-[#006c49] px-2 py-0.5 rounded-full">Kolay %20</span>
-                            <span className="bg-[#fff3e0] text-[#825100] px-2 py-0.5 rounded-full">Orta %60</span>
-                            <span className="bg-[#fce4ec] text-[#ba1a1a] px-2 py-0.5 rounded-full">Zor %20</span>
+                        return (
+                          <div className="flex flex-wrap gap-3">
+                            {renderExtremesTable(lowestStudents, '📉 En Düşük Puanlar', 'text-[#ba1a1a]')}
+                            {renderExtremesTable(medianStudents, '⚖️ Orta Seviye (Medyan)', 'text-[#825100]')}
+                            {renderExtremesTable(highestStudents, '🏆 En Yüksek Puanlar', 'text-[#006c49]')}
                           </div>
-                        </div>
-                        {(() => {
-                          const total = analizData.questionStats.length;
-                          const easyPct = total > 0 ? Math.round((analizData.easyQuestions.length / total) * 100) : 0;
-                          const mediumPct = total > 0 ? Math.round((analizData.mediumQuestions.length / total) * 100) : 0;
-                          const hardPct = total > 0 ? Math.round((analizData.hardQuestions.length / total) * 100) : 0;
+                        );
+                      })()}
 
-                          return (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-center text-xs border border-outline-variant rounded-lg overflow-hidden border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-50 border-b border-outline-variant font-bold">
-                                    <th className="px-3 py-1.5 bg-[#fce4ec] text-[#ba1a1a] align-middle">Zor (%0 - %20)</th>
-                                    <th className="px-3 py-1.5 bg-[#fff3cd] text-[#856404] align-middle">Orta (%20 - %80)</th>
-                                    <th className="px-3 py-1.5 bg-[#d4edda] text-[#155724] align-middle">Kolay (%80 - %100)</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <tr>
-                                    <td className="px-3 py-2 font-bold align-top min-h-[40px] border-r border-slate-100">
-                                      {analizData.hardQuestions.length > 0 ? (
-                                        <div className="flex flex-wrap justify-center gap-1">
-                                          {analizData.hardQuestions.map(c => (
-                                            <span key={c.id} className="inline-flex items-center justify-center bg-[#ba1a1a] text-white px-1.5 py-0.5 rounded text-[9px] font-bold leading-none" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
-                                          ))}
-                                        </div>
-                                      ) : '—'}
-                                    </td>
-                                    <td className="px-3 py-2 font-bold align-top min-h-[40px] border-r border-slate-100">
-                                      {analizData.mediumQuestions.length > 0 ? (
-                                        <div className="flex flex-wrap justify-center gap-1">
-                                          {analizData.mediumQuestions.map(c => (
-                                            <span key={c.id} className="inline-flex items-center justify-center bg-[#ffb95f] text-[#2a1700] px-1.5 py-0.5 rounded text-[9px] font-bold leading-none" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
-                                          ))}
-                                        </div>
-                                      ) : '—'}
-                                    </td>
-                                    <td className="px-3 py-2 font-bold align-top min-h-[40px]">
-                                      {analizData.easyQuestions.length > 0 ? (
-                                        <div className="flex flex-wrap justify-center gap-1">
-                                          {analizData.easyQuestions.map(c => (
-                                            <span key={c.id} className="inline-flex items-center justify-center bg-[#006c49] text-white px-1.5 py-0.5 rounded text-[9px] font-bold leading-none" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
-                                          ))}
-                                        </div>
-                                      ) : '—'}
-                                    </td>
-                                  </tr>
-                                  <tr className="border-t border-outline-variant bg-slate-50 font-bold text-[11px]">
-                                    <td className="px-3 py-1.5 text-[#ba1a1a]">{getBloomEmoji(hardPct, 20)} {hardPct}% ({analizData.hardQuestions.length}/{total})</td>
-                                    <td className="px-3 py-1.5 text-[#856404]">{getBloomEmoji(mediumPct, 60)} {mediumPct}% ({analizData.mediumQuestions.length}/{total})</td>
-                                    <td className="px-3 py-1.5 text-[#155724]">{getBloomEmoji(easyPct, 20)} {easyPct}% ({analizData.easyQuestions.length}/{total})</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          );
-                        })()}
+                      {/* Page Footer */}
+                      <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                        <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                        <span>Sayfa {totalCoursePages} / {totalCoursePages}</span>
                       </div>
-                    </>
-                  )}
+                    </div>
 
-                  {/* Student extremes */}
-                  {(() => {
-                    let studentGradesList = [];
-                    analizData.students.forEach(o => {
-                      let studentObtained = 0;
-                      let studentMax = 0;
-                      
-                      analizData.questions.forEach(q => {
-                        const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
-                        studentObtained += getQuestionScore(q, grade);
-                        studentMax += q.max_score;
-                      });
-                      
-                      if (analizData.isComboMode) {
-                        let rowWeighted = 0;
-                        analizData.reqExams.forEach(et => {
-                          const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
-                          const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
-                          let examObtained = 0;
-                          examQuestions.forEach(q => {
-                            const grade = analizData.grades.find(g => g.student === o.id && g.question === q.id);
-                            examObtained += getQuestionScore(q, grade);
-                          });
-                          const rawPercent = examMax > 0 ? (examObtained / examMax) * 100 : 0;
-                          rowWeighted += (rawPercent * analizData.pctMap[et]) / 100;
-                        });
-                        studentGradesList.push({
-                          number: o.number,
-                          name: o.name,
-                          value: rowWeighted,
-                          label: `${rowWeighted.toFixed(1)} (ağ.not)`
-                        });
-                      } else {
-                        studentGradesList.push({
-                          number: o.number,
-                          name: o.name,
-                          value: studentObtained,
-                          label: `${studentObtained}p / ${studentMax}p`
-                        });
-                      }
-                    });
-
-                    if (studentGradesList.length === 0) return null;
-
-                    studentGradesList.sort((a, b) => a.value - b.value);
-                    const lowestStudents = studentGradesList.slice(0, 3);
-                    const highestStudents = [...studentGradesList].reverse().slice(0, 3);
-
-                    // Median students
-                    const medianIndex = Math.floor(studentGradesList.length / 2);
-                    const startMedian = Math.max(0, studentGradesList.length >= 3 ? medianIndex - 1 : 0);
-                    const medianStudents = studentGradesList.slice(startMedian, startMedian + 3);
-
-                    const renderExtremesTable = (list, title, color) => (
-                      <div className="border border-outline-variant rounded-xl p-3.5 bg-white flex-1 min-w-[220px]">
-                        <h4 className={`text-xs font-bold mb-2 ${color}`}>{title}</h4>
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-100">
-                              <th className="px-2 py-1 font-bold">No</th>
-                              <th className="px-2 py-1 font-bold">Öğrenci</th>
-                              <th className="px-2 py-1 text-center font-bold">Değer</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {list.map(s => (
-                              <tr key={s.number}>
-                                <td className="px-2 py-1 font-bold font-mono text-[11px]">{s.number}</td>
-                                <td className="px-2 py-1 text-slate-500 font-semibold text-[11px]">{s.name}</td>
-                                <td className={`px-2 py-1 text-center font-bold text-[11px] ${color}`}>{s.label}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-
-                    return (
-                      <div className="flex flex-wrap gap-3">
-                        {renderExtremesTable(lowestStudents, '📉 En Düşük Puanlar', 'text-[#ba1a1a]')}
-                        {renderExtremesTable(medianStudents, '⚖️ Orta Seviye (Medyan)', 'text-[#825100]')}
-                        {renderExtremesTable(highestStudents, '🏆 En Yüksek Puanlar', 'text-[#006c49]')}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-              </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -2331,6 +2340,12 @@ export default function InstructorReports() {
                     </table>
                   </div>
                 </div>
+
+                {/* Page Footer */}
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                  <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                  <span>Sayfa 1 / 2</span>
+                </div>
               </div>
 
               {/* ========================================================
@@ -2434,6 +2449,12 @@ export default function InstructorReports() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                {/* Page Footer */}
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                  <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                  <span>Sayfa 2 / 2</span>
                 </div>
               </div>
 
