@@ -1078,9 +1078,9 @@ export default function InstructorReports() {
                   
                   {/* Dönem Bilgisi */}
                   <div className="flex justify-center">
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-slate-100/80 text-slate-700 rounded-full border border-slate-200 text-xs font-bold shadow-2xs">
-                      <span className="material-symbols-outlined text-[15px] text-slate-500">calendar_month</span>
-                      {activeTerm?.name || 'Dönem Belirtilmedi'}
+                    <span className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-slate-100/80 text-slate-700 rounded-full border border-slate-200 text-xs font-bold shadow-2xs leading-none">
+                      <span className="material-symbols-outlined text-[15px] leading-none text-slate-500">calendar_month</span>
+                      <span className="leading-none">{activeTerm?.name || 'Dönem Belirtilmedi'}</span>
                     </span>
                   </div>
 
@@ -1090,30 +1090,32 @@ export default function InstructorReports() {
 
                   {/* Öğretim Elemanı, Öğrenci Sayısı ve Sınav Modülü Rozetleri */}
                   <div className="flex flex-wrap justify-center items-center gap-2.5 pt-1.5 text-xs font-semibold text-slate-600">
-                    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 border border-blue-200/80 px-3 py-1 rounded-lg shadow-2xs">
-                      <span className="material-symbols-outlined text-[15px]">person</span>
-                      <strong>Öğretim Elemanı:</strong>{' '}
-                      {(() => {
-                        const instructors = selectedCourse.expand?.instructor;
-                        if (Array.isArray(instructors) && instructors.length > 0) {
-                          return instructors.map(inst => inst.title ? `${inst.title} ${inst.name}` : inst.name).join(', ');
-                        } else if (instructors?.name) {
-                          return instructors.title ? `${instructors.title} ${instructors.name}` : instructors.name;
-                        } else if (user?.name) {
-                          return user.title ? `${user.title} ${user.name}` : user.name;
-                        }
-                        return 'Tanımlanmadı';
-                      })()}
+                    <span className="inline-flex items-center justify-center gap-1.5 bg-blue-50 text-blue-800 border border-blue-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
+                      <span className="material-symbols-outlined text-[15px] leading-none">person</span>
+                      <span className="leading-none">
+                        <strong>Öğretim Elemanı:</strong>{' '}
+                        {(() => {
+                          const instructors = selectedCourse.expand?.instructor;
+                          if (Array.isArray(instructors) && instructors.length > 0) {
+                            return instructors.map(inst => inst.title ? `${inst.title} ${inst.name}` : inst.name).join(', ');
+                          } else if (instructors?.name) {
+                            return instructors.title ? `${instructors.title} ${instructors.name}` : instructors.name;
+                          } else if (user?.name) {
+                            return user.title ? `${user.title} ${user.name}` : user.name;
+                          }
+                          return 'Tanımlanmadı';
+                        })()}
+                      </span>
                     </span>
 
-                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1 rounded-lg shadow-2xs">
-                      <span className="material-symbols-outlined text-[15px]">group</span>
-                      <strong>Öğrenci Sayısı:</strong> {analizData.students?.length || 0} Kişi
+                    <span className="inline-flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
+                      <span className="material-symbols-outlined text-[15px] leading-none">group</span>
+                      <span className="leading-none"><strong>Öğrenci Sayısı:</strong> {analizData.students?.length || 0} Kişi</span>
                     </span>
 
-                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-200/80 px-3 py-1 rounded-lg shadow-2xs">
-                      <span className="material-symbols-outlined text-[15px]">analytics</span>
-                      <strong>Sınav Modülü:</strong> {analizData.modName}
+                    <span className="inline-flex items-center justify-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200/80 px-3 py-1.5 rounded-lg shadow-2xs leading-none">
+                      <span className="material-symbols-outlined text-[15px] leading-none">analytics</span>
+                      <span className="leading-none"><strong>Sınav Modülü:</strong> {analizData.modName}</span>
                     </span>
                   </div>
                 </div>
@@ -1971,9 +1973,9 @@ export default function InstructorReports() {
                 </h4>
                 <div className="flex justify-center gap-1.5 mt-2.5 flex-wrap">
                   {programReportData.selectedTerms.map(t => (
-                    <span key={t.id} className="bg-[#e3f2fd] text-[#1565c0] px-3 py-1 rounded-full text-xs font-bold border border-[#1565c0]/15">{t.name}</span>
+                    <span key={t.id} className="inline-flex items-center justify-center bg-[#e3f2fd] text-[#1565c0] px-3 py-1.5 rounded-full text-xs font-bold border border-[#1565c0]/15 leading-none">{t.name}</span>
                   ))}
-                  <span className="bg-[#fff3e0] text-[#e65100] px-3 py-1 rounded-full text-xs font-bold border border-[#e65100]/15">
+                  <span className="inline-flex items-center justify-center bg-[#fff3e0] text-[#e65100] px-3 py-1.5 rounded-full text-xs font-bold border border-[#e65100]/15 leading-none">
                     {programReportData.selectedClassIds.map(c => `${c}. Sınıf`).join(', ')}
                   </span>
                 </div>
