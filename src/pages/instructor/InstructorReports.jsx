@@ -888,7 +888,45 @@ export default function InstructorReports() {
         margin: [0.3, 0.3, 0.3, 0.3],
         filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          onclone: (clonedDoc) => {
+            const style = clonedDoc.createElement('style');
+            style.innerHTML = `
+              * {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              .material-symbols-outlined {
+                font-family: 'Material Symbols Outlined' !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                vertical-align: middle !important;
+                line-height: 1 !important;
+              }
+              span[class*="bg-"], span[class*="rounded"], .rounded-full, .rounded-lg, .rounded {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                vertical-align: middle !important;
+                line-height: 1 !important;
+                padding-top: 3px !important;
+                padding-bottom: 3px !important;
+              }
+              th, td {
+                vertical-align: middle !important;
+              }
+              img {
+                display: inline-block !important;
+              }
+            `;
+            clonedDoc.head.appendChild(style);
+          }
+        },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape', compress: true },
         pagebreak: { mode: ['css', 'legacy'], avoid: ['.card', 'tr'] }
       };
@@ -909,7 +947,45 @@ export default function InstructorReports() {
       margin: [0.4, 0.4, 0.4, 0.4],
       filename,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            * {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .material-symbols-outlined {
+              font-family: 'Material Symbols Outlined' !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              vertical-align: middle !important;
+              line-height: 1 !important;
+            }
+            span[class*="bg-"], span[class*="rounded"], .rounded-full, .rounded-lg, .rounded {
+              display: inline-flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              vertical-align: middle !important;
+              line-height: 1 !important;
+              padding-top: 3px !important;
+              padding-bottom: 3px !important;
+            }
+            th, td {
+              vertical-align: middle !important;
+            }
+            img {
+              display: inline-block !important;
+            }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape', compress: true },
       pagebreak: { mode: ['css', 'legacy'], avoid: ['.card', 'tr'] }
     };
@@ -1549,8 +1625,10 @@ export default function InstructorReports() {
                                         <td className="px-2 py-1.5 font-bold">{s.code || `S${s.number}`}</td>
                                         <td className="px-2 py-1.5 text-slate-500">{s.type}</td>
                                         <td className="px-2 py-1.5 text-center font-bold text-[#0058be]">{s.answer || '—'}</td>
-                                        <td className={`px-2 py-1.5 text-center font-bold text-white rounded ${getBadgeColorByValue(success)}`}>
-                                          {success.toFixed(1)}%
+                                        <td className="px-2 py-1.5 text-center align-middle">
+                                          <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded font-bold text-white leading-none ${getBadgeColorByValue(success)}`}>
+                                            {success.toFixed(1)}%
+                                          </span>
                                         </td>
                                         <td className="px-2 py-1.5">
                                           {s.type === 'Çoktan Seçmeli' || s.type === 'Doğru/Yanlış' ? (
@@ -1558,7 +1636,7 @@ export default function InstructorReports() {
                                               {Object.entries(ansCounts).map(([ans, count]) => {
                                                 const isCorrect = ans.toUpperCase() === (s.answer || '').toUpperCase();
                                                 return (
-                                                  <span key={ans} className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isCorrect ? 'bg-[#006c49] text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                                  <span key={ans} className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-bold leading-none ${isCorrect ? 'bg-[#006c49] text-white' : 'bg-slate-100 text-slate-600'}`}>
                                                     {ans}: {count}
                                                   </span>
                                                 );
@@ -1598,8 +1676,10 @@ export default function InstructorReports() {
                                 <td className="px-3 py-2 font-bold">{s.code}</td>
                                 <td className="px-3 py-2 text-slate-500">{s.type}</td>
                                 <td className="px-3 py-2 text-center font-bold text-primary">{s.answer || '—'}</td>
-                                <td className={`px-3 py-2 text-center font-bold text-white rounded ${getBadgeColorByValue(s.success)}`}>
-                                  {s.success.toFixed(1)}%
+                                <td className="px-3 py-2 text-center align-middle">
+                                  <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded font-bold text-white leading-none ${getBadgeColorByValue(s.success)}`}>
+                                    {s.success.toFixed(1)}%
+                                  </span>
                                 </td>
                                 <td className="px-3 py-2">
                                   {s.type === 'Çoktan Seçmeli' || s.type === 'Doğru/Yanlış' ? (
@@ -1607,7 +1687,7 @@ export default function InstructorReports() {
                                       {Object.entries(s.answerCounts).map(([ans, count]) => {
                                         const isCorrect = ans.toUpperCase() === (s.answer || '').toUpperCase();
                                         return (
-                                          <span key={ans} className={`px-2 py-0.5 rounded text-[10px] font-bold ${isCorrect ? 'bg-[#006c49] text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                          <span key={ans} className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold leading-none ${isCorrect ? 'bg-[#006c49] text-white' : 'bg-slate-100 text-slate-600'}`}>
                                             {ans}: {count}
                                           </span>
                                         );
@@ -1677,11 +1757,11 @@ export default function InstructorReports() {
                     {/* Bloom taxonomy zorluk analizi */}
                     <div className="border border-outline-variant rounded-xl p-5 bg-white space-y-3">
                       <h4 className="text-sm font-bold text-on-surface">🎯 Soru Zorluk Analizi — Bloom Taksonomisi</h4>
-                      <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
                         <span>Hedef Dağılım:</span>
-                        <span className="bg-[#e8f5e9] text-[#006c49] px-2.5 py-0.5 rounded-full">Kolay %20</span>
-                        <span className="bg-[#fff3e0] text-[#825100] px-2.5 py-0.5 rounded-full">Orta %60</span>
-                        <span className="bg-[#fce4ec] text-[#ba1a1a] px-2.5 py-0.5 rounded-full">Zor %20</span>
+                        <span className="inline-flex items-center justify-center bg-[#e8f5e9] text-[#006c49] px-2.5 py-1 rounded-full leading-none">Kolay %20</span>
+                        <span className="inline-flex items-center justify-center bg-[#fff3e0] text-[#825100] px-2.5 py-1 rounded-full leading-none">Orta %60</span>
+                        <span className="inline-flex items-center justify-center bg-[#fce4ec] text-[#ba1a1a] px-2.5 py-1 rounded-full leading-none">Zor %20</span>
                       </div>
                       {(() => {
                         const total = analizData.questionStats.length;
@@ -1694,36 +1774,36 @@ export default function InstructorReports() {
                             <table className="w-full text-center text-xs border border-outline-variant rounded-lg overflow-hidden border-collapse">
                               <thead>
                                 <tr className="bg-slate-50 border-b border-outline-variant font-bold">
-                                  <th className="px-4 py-2 bg-[#fce4ec] text-[#ba1a1a]">Zor (%0 - %20) — Hedef: %20</th>
-                                  <th className="px-4 py-2 bg-[#fff3cd] text-[#856404]">Orta (%20 - %80) — Hedef: %60</th>
-                                  <th className="px-4 py-2 bg-[#d4edda] text-[#155724]">Kolay (%80 - %100) — Hedef: %20</th>
+                                  <th className="px-4 py-2 bg-[#fce4ec] text-[#ba1a1a] align-middle">Zor (%0 - %20) — Hedef: %20</th>
+                                  <th className="px-4 py-2 bg-[#fff3cd] text-[#856404] align-middle">Orta (%20 - %80) — Hedef: %60</th>
+                                  <th className="px-4 py-2 bg-[#d4edda] text-[#155724] align-middle">Kolay (%80 - %100) — Hedef: %20</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 <tr>
                                   <td className="px-4 py-4 font-bold align-top min-h-[50px] border-r border-slate-100">
                                     {analizData.hardQuestions.length > 0 ? (
-                                      <div className="flex flex-wrap justify-center gap-1">
+                                      <div className="flex flex-wrap justify-center gap-1.5">
                                         {analizData.hardQuestions.map(c => (
-                                          <span key={c.id} className="bg-[#ba1a1a] text-white px-2 py-0.5 rounded text-[10px] font-bold" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
+                                          <span key={c.id} className="inline-flex items-center justify-center bg-[#ba1a1a] text-white px-2 py-1 rounded text-[10px] font-bold leading-none" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
                                         ))}
                                       </div>
                                     ) : '—'}
                                   </td>
                                   <td className="px-4 py-4 font-bold align-top min-h-[50px] border-r border-slate-100">
                                     {analizData.mediumQuestions.length > 0 ? (
-                                      <div className="flex flex-wrap justify-center gap-1">
+                                      <div className="flex flex-wrap justify-center gap-1.5">
                                         {analizData.mediumQuestions.map(c => (
-                                          <span key={c.id} className="bg-[#ffb95f] text-[#2a1700] px-2 py-0.5 rounded text-[10px] font-bold" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
+                                          <span key={c.id} className="inline-flex items-center justify-center bg-[#ffb95f] text-[#2a1700] px-2 py-1 rounded text-[10px] font-bold leading-none" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
                                         ))}
                                       </div>
                                     ) : '—'}
                                   </td>
                                   <td className="px-4 py-4 font-bold align-top min-h-[50px]">
                                     {analizData.easyQuestions.length > 0 ? (
-                                      <div className="flex flex-wrap justify-center gap-1">
+                                      <div className="flex flex-wrap justify-center gap-1.5">
                                         {analizData.easyQuestions.map(c => (
-                                          <span key={c.id} className="bg-[#006c49] text-white px-2 py-0.5 rounded text-[10px] font-bold" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
+                                          <span key={c.id} className="inline-flex items-center justify-center bg-[#006c49] text-white px-2 py-1 rounded text-[10px] font-bold leading-none" title={`Başarı: ${c.success.toFixed(1)}%`}>{c.code}</span>
                                         ))}
                                       </div>
                                     ) : '—'}
