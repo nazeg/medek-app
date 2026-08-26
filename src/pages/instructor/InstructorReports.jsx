@@ -66,13 +66,16 @@ export default function InstructorReports() {
         sort: 'code',
         expand: 'program,instructor'
       }).then(list => {
-        const assignedList = list.filter(course => {
+        let assignedList = list.filter(course => {
           if (!course.instructor) return false;
           if (Array.isArray(course.instructor)) {
             return course.instructor.includes(user.id);
           }
           return course.instructor === user.id;
         });
+        if (activeProgram?.id) {
+          assignedList = assignedList.filter(c => c.program === activeProgram.id || c.expand?.program?.id === activeProgram.id);
+        }
         setCoursesList(assignedList);
         if (assignedList.length > 0) {
           setSelectedCourse(assignedList[0]);

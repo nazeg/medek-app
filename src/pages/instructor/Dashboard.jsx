@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTerm } from '../../contexts/TermContext';
+import { useProgram } from '../../contexts/ProgramContext';
 import { useActiveCourse } from '../../contexts/CourseContext';
 
 export default function InstructorDashboard() {
   const { user } = useAuth();
   const { activeTerm } = useTerm();
+  const { activeProgram } = useProgram();
   const { selectCourse } = useActiveCourse();
   const navigate = useNavigate();
 
@@ -41,13 +43,17 @@ export default function InstructorDashboard() {
           sort: 'code'
         });
         
-        const filteredCourses = assignedCourses.filter(course => {
+        let filteredCourses = assignedCourses.filter(course => {
           if (!course.instructor) return false;
           if (Array.isArray(course.instructor)) {
             return course.instructor.includes(user.id);
           }
           return course.instructor === user.id;
         });
+
+        if (activeProgram?.id) {
+          filteredCourses = filteredCourses.filter(c => c.program === activeProgram.id || c.expand?.program?.id === activeProgram.id);
+        }
 
         setCourses(filteredCourses);
 
@@ -121,7 +127,7 @@ export default function InstructorDashboard() {
     };
 
     loadDashboardData();
-  }, [user, activeTerm]);
+  }, [user, activeTerm, activeProgram]);
 
   const handleQuickAction = (courseId, path) => {
     selectCourse(courseId);

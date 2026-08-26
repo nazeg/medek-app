@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProgram } from '../../contexts/ProgramContext';
+import { useTerm } from '../../contexts/TermContext';
 
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
+  const { activeProgram, programs } = useProgram();
+  const { activeTerm } = useTerm();
 
   const [stats, setStats] = useState({
     programs: 0,
@@ -24,35 +28,47 @@ export default function CoordinatorDashboard() {
       try {
         setLoading(true);
 
-        // Build filter based on role
         const isCoordinator = user.role === 'coordinator';
-        const progFilter = isCoordinator
+        
+        // Base program filter
+        let progFilter = isCoordinator
           ? `faculty = "${user.faculty}"`
           : `head = "${user.id}"`;
+
+        // If specific program is selected in top navbar
+        const targetProgId = activeProgram?.id;
+        
+        const courseFilter = targetProgId 
+          ? (activeTerm?.id ? `program = "${targetProgId}" && term = "${activeTerm.id}"` : `program = "${targetProgId}"`)
+          : (isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`);
+
+        const poFilter = targetProgId
+          ? `program = "${targetProgId}"`
+          : (isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`);
+
+        const coFilter = targetProgId
+          ? `course.program = "${targetProgId}"`
+          : (isCoordinator ? `course.program.faculty = "${user.faculty}"` : `course.program.head = "${user.id}"`);
+
+        const matrixFilter = targetProgId
+          ? `program = "${targetProgId}"`
+          : (isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`);
 
         const [progsRes, coursesRes, poRes, coRes, matrixRes, instructorsRes] = await Promise.all([
           pb.collection('programs').getFullList({ sort: 'name', filter: progFilter }),
           pb.collection('courses').getFullList({
             sort: 'name',
-            filter: isCoordinator
-              ? `program.faculty = "${user.faculty}"`
-              : `program.head = "${user.id}"`,
+            filter: courseFilter,
             expand: 'instructor,program',
           }),
           pb.collection('program_outcomes').getList(1, 1, {
-            filter: isCoordinator
-              ? `program.faculty = "${user.faculty}"`
-              : `program.head = "${user.id}"`,
+            filter: poFilter,
           }),
           pb.collection('course_outcomes').getList(1, 1, {
-            filter: isCoordinator
-              ? `course.program.faculty = "${user.faculty}"`
-              : `course.program.head = "${user.id}"`,
+            filter: coFilter,
           }),
           pb.collection('pc_dc_matrix').getList(1, 1, {
-            filter: isCoordinator
-              ? `program.faculty = "${user.faculty}"`
-              : `program.head = "${user.id}"`,
+            filter: matrixFilter,
           }),
           pb.collection('users').getList(1, 1, {
             filter: isCoordinator
@@ -61,13 +77,27 @@ export default function CoordinatorDashboard() {
           }),
         ]);
 
+        // If activeProgram is selected, calculate instructors assigned to this program's courses
+        let instructorCount = instructorsRes.totalItems;
+        if (targetProgId) {
+          const programInstructors = new Set();
+          coursesRes.forEach(c => {
+            if (Array.isArray(c.instructor)) {
+              c.instructor.forEach(i => programInstructors.add(i));
+            } else if (c.instructor) {
+              programInstructors.add(c.instructor);
+            }
+          });
+          instructorCount = programInstructors.size;
+        }
+
         setStats({
-          programs: progsRes.length,
+          programs: targetProgId ? 1 : progsRes.length,
           courses: coursesRes.length,
           outcomes: poRes.totalItems,
           courseOutcomes: coRes.totalItems,
           matrixRows: matrixRes.totalItems,
-          instructors: instructorsRes.totalItems,
+          instructors: instructorCount,
         });
         setCourses(coursesRes.slice(0, 8));
       } catch (err) {
@@ -78,7 +108,7 @@ export default function CoordinatorDashboard() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, activeProgram, activeTerm]);
 
   const statCards = [
     {

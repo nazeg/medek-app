@@ -42,11 +42,15 @@ export function CourseProvider({ children }) {
         return course.instructor === user.id;
       });
 
-      setCourses(assignedList);
+      const programFiltered = activeProgram?.id 
+        ? assignedList.filter(c => c.program === activeProgram.id)
+        : assignedList;
+
+      setCourses(programFiltered);
       
       const savedCourseId = localStorage.getItem(`medek_active_course_id_${user.id}_${activeTerm.id}`);
       if (savedCourseId) {
-        const found = assignedList.find(c => c.id === savedCourseId);
+        const found = programFiltered.find(c => c.id === savedCourseId);
         if (found) {
           setActiveCourse(found);
           setLoading(false);
@@ -54,9 +58,9 @@ export function CourseProvider({ children }) {
         }
       }
       
-      if (assignedList.length > 0) {
-        setActiveCourse(assignedList[0]);
-        localStorage.setItem(`medek_active_course_id_${user.id}_${activeTerm.id}`, assignedList[0].id);
+      if (programFiltered.length > 0) {
+        setActiveCourse(programFiltered[0]);
+        localStorage.setItem(`medek_active_course_id_${user.id}_${activeTerm.id}`, programFiltered[0].id);
       } else {
         setActiveCourse(null);
       }
@@ -65,7 +69,7 @@ export function CourseProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [user, activeTerm]);
+  }, [user, activeTerm, activeProgram]);
 
   useEffect(() => {
     loadCourses();
