@@ -1502,10 +1502,10 @@ export default function InstructorReports() {
                 </div>
 
                 {/* ========================================================
-                    PAGE 3: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ) (PAGINATED)
+                    PAGE 3: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ)
                    ======================================================== */}
                 {(() => {
-                  const studentChunks = chunkArray(analizData.students, 30);
+                  const studentChunks = isExportingPDF ? chunkArray(analizData.students, 30) : [analizData.students];
 
                   return studentChunks.map((chunk, chunkIdx) => (
                     <div key={`kazanim-page-${chunkIdx}`} className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
@@ -1560,7 +1560,7 @@ export default function InstructorReports() {
                                   {analizData.pcs.map(pc => {
                                     const pct = analizData.studentPcSuccess[o.id]?.[pc.code] || 0;
                                     return (
-                                      <td key={pc.id} className="px-2 py-1.5 text-center font-bold text-xs bg-[#f1f8e9] text-on-surface">
+                                      <td key={pc.id} className="px-2 py-2 text-center font-bold text-xs bg-[#f1f8e9] text-on-surface">
                                         %{pct.toFixed(2).replace('.', ',')}
                                       </td>
                                     );
@@ -1582,10 +1582,10 @@ export default function InstructorReports() {
                 })()}
 
                 {/* ========================================================
-                    PAGE 4: ÖĞRENCİ BAZLI BAŞARI ÖZETİ (PAGINATED)
+                    PAGE 4: ÖĞRENCİ BAZLI BAŞARI ÖZETİ
                    ======================================================== */}
                 {(() => {
-                  const studentChunks = chunkArray(analizData.students, 30);
+                  const studentChunks = isExportingPDF ? chunkArray(analizData.students, 30) : [analizData.students];
                   const isCombo = analizData.isComboMode;
 
                   // Pre-calculate whole-class averages
