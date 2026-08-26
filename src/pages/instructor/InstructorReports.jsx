@@ -901,6 +901,7 @@ export default function InstructorReports() {
               tbl.style.width = '100%';
               tbl.style.maxWidth = '100%';
               tbl.style.tableLayout = 'auto';
+              tbl.style.display = 'table';
             });
 
             const style = clonedDoc.createElement('style');
@@ -910,9 +911,34 @@ export default function InstructorReports() {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
-              .pdf-avoid-break, .break-inside-avoid, [class*="rounded-xl"], table, tr {
+              .pdf-avoid-break {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
+              }
+              table {
+                display: table !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                border-collapse: collapse !important;
+              }
+              thead {
+                display: table-header-group !important;
+              }
+              tbody {
+                display: table-row-group !important;
+              }
+              tr {
+                display: table-row !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+              th, td {
+                display: table-cell !important;
+                vertical-align: middle !important;
+              }
+              h2, h3, h4 {
+                break-after: avoid !important;
+                page-break-after: avoid !important;
               }
               .material-symbols-outlined {
                 font-family: 'Material Symbols Outlined' !important;
@@ -931,9 +957,6 @@ export default function InstructorReports() {
                 padding-top: 3px !important;
                 padding-bottom: 3px !important;
               }
-              th, td {
-                vertical-align: middle !important;
-              }
               img {
                 display: inline-block !important;
               }
@@ -942,7 +965,7 @@ export default function InstructorReports() {
           }
         },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape', compress: true },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', '.break-inside-avoid', 'table', 'tr', '.rounded-xl', '.border'] }
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', 'tr'] }
       };
       await html2pdf().set(opt).from(printCourseRef.current).save();
     } catch (err) {
@@ -974,6 +997,7 @@ export default function InstructorReports() {
             tbl.style.width = '100%';
             tbl.style.maxWidth = '100%';
             tbl.style.tableLayout = 'auto';
+            tbl.style.display = 'table';
           });
 
           const style = clonedDoc.createElement('style');
@@ -983,9 +1007,34 @@ export default function InstructorReports() {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-            .pdf-avoid-break, .break-inside-avoid, [class*="rounded-xl"], table, tr {
+            .pdf-avoid-break {
               break-inside: avoid !important;
               page-break-inside: avoid !important;
+            }
+            table {
+              display: table !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              border-collapse: collapse !important;
+            }
+            thead {
+              display: table-header-group !important;
+            }
+            tbody {
+              display: table-row-group !important;
+            }
+            tr {
+              display: table-row !important;
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+            th, td {
+              display: table-cell !important;
+              vertical-align: middle !important;
+            }
+            h2, h3, h4 {
+              break-after: avoid !important;
+              page-break-after: avoid !important;
             }
             .material-symbols-outlined {
               font-family: 'Material Symbols Outlined' !important;
@@ -1004,9 +1053,6 @@ export default function InstructorReports() {
               padding-top: 3px !important;
               padding-bottom: 3px !important;
             }
-            th, td {
-              vertical-align: middle !important;
-            }
             img {
               display: inline-block !important;
             }
@@ -1015,7 +1061,7 @@ export default function InstructorReports() {
         }
       },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape', compress: true },
-      pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', '.break-inside-avoid', 'table', 'tr', '.rounded-xl', '.border'] }
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-avoid-break', 'tr'] }
     };
     html2pdf().set(opt).from(printProgramRef.current).save();
   };
@@ -1305,28 +1351,28 @@ export default function InstructorReports() {
                 )}
 
                 {/* Exam questions structure (read-only view) */}
-                <div className="border border-outline-variant rounded-xl p-5 bg-white pdf-avoid-break break-inside-avoid">
+                <div className="border border-outline-variant rounded-xl p-5 bg-white">
                   <h4 className="text-sm font-bold text-on-surface mb-3">📝 Sınav Soru Tanımlama Bilgileri</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={analizData.reqExams.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "w-full"}>
                     {analizData.reqExams.map(et => {
                       const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
                       if (examQuestions.length === 0) return null;
                       const maxTotal = examQuestions.reduce((s, q) => s + (q.max_score || 0), 0);
                       
                       return (
-                        <div key={et} className="border border-outline-variant rounded-lg overflow-hidden bg-white">
-                          <div className="bg-slate-50 border-b border-outline-variant px-3 py-2 flex justify-between items-center text-xs font-bold text-on-surface">
+                        <div key={et} className="w-full border border-outline-variant rounded-lg overflow-hidden bg-white">
+                          <div className="bg-slate-50 border-b border-outline-variant px-3 py-2 flex justify-between items-center text-xs font-bold text-on-surface w-full">
                             <span>{et}</span>
                             <span className="text-slate-500 font-normal">({examQuestions.length} soru — Toplam: {maxTotal} puan)</span>
                           </div>
                           <table className="w-full text-left text-[11px] border-collapse">
                             <thead>
                               <tr className="bg-slate-50/30 border-b border-slate-100 font-semibold text-slate-500">
-                                <th className="px-2 py-1.5 text-center">Kod</th>
+                                <th className="px-2 py-1.5 text-center w-12">Kod</th>
                                 <th className="px-2 py-1.5">Tür</th>
                                 <th className="px-2 py-1.5 text-center">DÇ</th>
-                                <th className="px-2 py-1.5 text-center">Puan</th>
-                                <th className="px-2 py-1.5 text-center">Cevap</th>
+                                <th className="px-2 py-1.5 text-center w-16">Puan</th>
+                                <th className="px-2 py-1.5 text-center w-16">Cevap</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -1338,7 +1384,7 @@ export default function InstructorReports() {
                                     <td className="px-2 py-1.5 text-slate-600">{q.type}</td>
                                     <td className="px-2 py-1.5 text-center">
                                       {qDcs.map(code => (
-                                        <span key={code} className="inline-block bg-[#0058be]/10 text-[#0058be] px-1 py-0.5 rounded text-[9px] font-bold mx-0.5">{code}</span>
+                                        <span key={code} className="inline-flex items-center justify-center bg-[#0058be]/10 text-[#0058be] px-1 py-0.5 rounded text-[9px] font-bold mx-0.5 leading-none">{code}</span>
                                       ))}
                                     </td>
                                     <td className="px-2 py-1.5 font-bold text-center">{q.max_score}</td>
@@ -1355,7 +1401,7 @@ export default function InstructorReports() {
                 </div>
 
                 {/* Outcome Success Aggregates for all students */}
-                <div className="border border-outline-variant rounded-xl p-5 bg-white pdf-avoid-break break-inside-avoid">
+                <div className="border border-outline-variant rounded-xl p-5 bg-white">
                   <h4 className="text-sm font-bold text-on-surface mb-3">🎓 Öğrenci Kazanım Özeti ({analizData.modName})</h4>
                   <div className={`overflow-x-auto ${isExportingPDF ? 'overflow-visible max-h-none' : 'max-h-[350px] overflow-y-auto custom-scrollbar'}`}>
                     <table className="w-full text-left border-collapse text-xs">
@@ -1401,7 +1447,7 @@ export default function InstructorReports() {
                 </div>
 
                 {/* Student Question Grades Details */}
-                <div className="border border-outline-variant rounded-xl p-5 bg-white pdf-avoid-break break-inside-avoid">
+                <div className="border border-outline-variant rounded-xl p-5 bg-white">
                   <h4 className="text-sm font-bold text-on-surface mb-3">🧑‍🎓 Öğrenci Bazlı Başarı Özeti ({analizData.modName})</h4>
                   
                   {analizData.isComboMode ? (
@@ -1634,7 +1680,7 @@ export default function InstructorReports() {
                 </div>
 
                 {/* Soru Bazlı Başarı Özeti */}
-                <div className="grid grid-cols-1 gap-6 pdf-avoid-break break-inside-avoid">
+                <div className="grid grid-cols-1 gap-6">
                   {analizData.isComboMode ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {analizData.reqExams.map(et => {
@@ -1644,7 +1690,7 @@ export default function InstructorReports() {
                         if (list.length === 0) return null;
 
                         return (
-                          <div key={et} className="border border-outline-variant rounded-xl p-4 bg-white space-y-3 pdf-avoid-break break-inside-avoid">
+                          <div key={et} className="border border-outline-variant rounded-xl p-4 bg-white space-y-3">
                             <h4 className="text-xs font-bold text-primary">📊 {et} Soru Başarı Özeti</h4>
                             <div className="overflow-x-auto">
                               <table className="w-full text-left text-[11px] border-collapse">
@@ -1700,7 +1746,7 @@ export default function InstructorReports() {
                       })}
                     </div>
                   ) : (
-                    <div className="border border-outline-variant rounded-xl p-5 bg-white space-y-3 pdf-avoid-break break-inside-avoid">
+                    <div className="border border-outline-variant rounded-xl p-5 bg-white space-y-3">
                       <h4 className="text-sm font-bold text-on-surface">📊 Soru Bazlı Başarı Özeti ({analizData.modName})</h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
