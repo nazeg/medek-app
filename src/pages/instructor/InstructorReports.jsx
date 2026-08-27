@@ -408,6 +408,10 @@ export default function InstructorReports() {
         pb.collection('student_grades').getFullList({ filter: `exam.course = "${selectedCourse.id}"` })
       ]);
 
+      // Natural numerical sorting: PÇ1, PÇ2, ..., PÇ9, PÇ10
+      pcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+      dcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+
       const reqExams = targetExams;
       const missingExams = reqExams.filter(exam => !questions.some(q => q.expand?.exam?.type === exam));
 
