@@ -880,22 +880,17 @@ export default function InstructorReports() {
             pb.collection('student_grades').getFullList({ filter: `exam.course = "${course.id}"` })
           ]);
 
-          const allTypes = [...new Set(questions.map(q => q.expand?.exam?.type).filter(Boolean))];
-          if (dcs.length === 0 || questions.length === 0 || allTypes.length === 0) continue;
-
-          // Sınava fiilen katılan öğrencileri belirle
           const students = rawStudents.filter(s => {
-            if (Array.isArray(s.courses) && !s.courses.includes(course.id)) return false;
-            return allTypes.some(et => hasStudentTakenExam(s.id, et, questions, grades));
+            if (Array.isArray(s.courses) && s.courses.includes(course.id)) return true;
+            if (grades.some(g => g.student === s.id)) return true;
+            return false;
           });
 
-          if (students.length === 0) continue;
+          if (dcs.length === 0 || questions.length === 0 || students.length === 0) continue;
 
-          // Değerlendirilecek temel sınav kategorileri (Bütünleme, Final ile aynı dönemsel etki dilimindedir)
-          const useExams = allTypes.filter(et => et !== 'Bütünleme');
-          if (useExams.length === 0 && allTypes.includes('Bütünleme')) {
-            useExams.push('Bütünleme');
-          }
+          const allTypes = [...new Set(questions.map(q => q.expand?.exam?.type))];
+          const hasFinal = allTypes.includes('Final');
+          const useExams = allTypes.filter(et => et && !(et === 'Bütünleme' && hasFinal));
 
           const pctMap = {
             'Vize': course.pct_vize ?? 40,
@@ -911,6 +906,7 @@ export default function InstructorReports() {
               if (cw.name) pctMap[cw.name] = cw.percentage ?? 0;
             });
           }
+          const isMulti = useExams.length > 1;
 
           const dcExamSonuc = {};
           dcs.forEach(d => {
@@ -918,25 +914,22 @@ export default function InstructorReports() {
             useExams.forEach(et => { dcExamSonuc[d.code][et] = { alinan: 0, max: 0 }; });
           });
 
-          // Öğrenci bazında Final / Bütünleme telafisini dikkate alarak ders çıktıları toplamını hesapla
           students.forEach(o => {
-            useExams.forEach(et => {
-              const effectiveExam = getEffectiveExamForStudent(o.id, et, questions, grades);
-              const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
+            questions.forEach(q => {
+              const examType = q.expand?.exam?.type;
+              if (!useExams.includes(examType)) return;
 
-              examQuestions.forEach(q => {
-                const qDcCodes = getQuestionDcCodes(q);
-                if (qDcCodes.length === 0) return;
+              const qDcCodes = getQuestionDcCodes(q);
+              if (qDcCodes.length === 0) return;
 
-                const grade = grades.find(g => g.student === o.id && g.question === q.id);
-                const score = getQuestionScore(q, grade);
+              const grade = grades.find(g => g.student === o.id && g.question === q.id);
+              const score = getQuestionScore(q, grade);
 
-                qDcCodes.forEach(code => {
-                  if (dcExamSonuc[code] && dcExamSonuc[code][et]) {
-                    dcExamSonuc[code][et].alinan += Number(score);
-                    dcExamSonuc[code][et].max += Number(q.max_score);
-                  }
-                });
+              qDcCodes.forEach(code => {
+                if (dcExamSonuc[code] && dcExamSonuc[code][examType]) {
+                  dcExamSonuc[code][examType].alinan += Number(score);
+                  dcExamSonuc[code][examType].max += Number(q.max_score);
+                }
               });
             });
           });
@@ -944,17 +937,23 @@ export default function InstructorReports() {
           const dcSuccessMap = {};
           const dcAssessed = {};
           dcs.forEach(dc => {
-            let wSum = 0, wTotal = 0;
-            useExams.forEach(et => {
+            if (!isMulti) {
+              const et = useExams[0];
               const { alinan, max } = dcExamSonuc[dc.code]?.[et] || { alinan: 0, max: 0 };
-              if (max > 0) {
-                const w = (pctMap[et] !== undefined && pctMap[et] > 0) ? pctMap[et] : (100 / useExams.length);
-                wSum += (alinan / max) * 100 * w;
-                wTotal += w;
-              }
-            });
-            dcSuccessMap[dc.code] = wTotal > 0 ? wSum / wTotal : 0;
-            dcAssessed[dc.code] = wTotal > 0;
+              dcSuccessMap[dc.code] = max > 0 ? (alinan / max) * 100 : 0;
+              dcAssessed[dc.code] = max > 0;
+            } else {
+              let wSum = 0, wTotal = 0;
+              useExams.forEach(et => {
+                const { alinan, max } = dcExamSonuc[dc.code]?.[et] || { alinan: 0, max: 0 };
+                if (max > 0) {
+                  wSum += (alinan / max) * 100 * (pctMap[et] || 0);
+                  wTotal += (pctMap[et] || 0);
+                }
+              });
+              dcSuccessMap[dc.code] = wTotal > 0 ? wSum / wTotal : 0;
+              dcAssessed[dc.code] = wTotal > 0;
+            }
           });
 
           const coursePc = {};
