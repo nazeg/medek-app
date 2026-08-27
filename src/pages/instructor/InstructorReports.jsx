@@ -425,27 +425,7 @@ export default function InstructorReports() {
       const relevantQuestions = questions.filter(q => reqExams.includes(q.expand?.exam?.type));
       const relevantQuestionIds = new Set(relevantQuestions.map(q => q.id));
 
-      // Sınava katılan öğrencileri belirle:
-      // Seçilen sınav(lar)da notu/cevabı girilmemiş (veya Bütünleme kombinasyonunda Final notu da olmayan) devamsız öğrencileri rapora dahil etme
-      const enrolledOrGraded = rawStudents.filter(s => {
-        if (Array.isArray(s.courses) && s.courses.includes(selectedCourse.id)) return true;
-        if (grades.some(g => g.student === s.id && relevantQuestionIds.has(g.question))) return true;
-        return false;
-      });
-
-      const students = enrolledOrGraded.filter(s => {
-        return reqExams.some(et => {
-          if (hasStudentTakenExam(s.id, et, questions, grades)) return true;
-          if (et === 'Bütünleme' && hasStudentTakenExam(s.id, 'Final', questions, grades)) return true;
-          return false;
-        });
-      });
-
-      if (students.length === 0) {
-        alert(`Seçilen sınav(lar) için notu/katılımı bulunan öğrenci bulunamadı. Lütfen önce "Not Girişi" sayfasından öğrencilerin sınav notlarını kaydediniz.`, 'Öğrenci Notu Bulunamadı', 'warning');
-        setLoading(false);
-        return;
-      }
+      const isComboMode = reqExams.length > 1;
 
       const pctMap = {
         'Vize': selectedCourse.pct_vize ?? 40,
@@ -462,7 +442,31 @@ export default function InstructorReports() {
         });
       }
 
-      const isComboMode = reqExams.length > 1;
+      // Sınava katılan öğrencileri belirle:
+      const enrolledOrGraded = rawStudents.filter(s => {
+        if (Array.isArray(s.courses) && s.courses.includes(selectedCourse.id)) return true;
+        if (grades.some(g => g.student === s.id && relevantQuestionIds.has(g.question))) return true;
+        return false;
+      });
+
+      const students = enrolledOrGraded.filter(s => {
+        if (!isComboMode) {
+          // Tekil sınav analizi: SADECE o tekil sınava girmiş olan öğrencileri dahil et
+          return hasStudentTakenExam(s.id, reqExams[0], questions, grades);
+        }
+        // Kombinasyon modu (ör. Vize + Bütünleme):
+        return reqExams.some(et => {
+          if (hasStudentTakenExam(s.id, et, questions, grades)) return true;
+          if (et === 'Bütünleme' && hasStudentTakenExam(s.id, 'Final', questions, grades)) return true;
+          return false;
+        });
+      });
+
+      if (students.length === 0) {
+        alert(`Seçilen sınav(lar) için notu/katılımı bulunan öğrenci bulunamadı. Lütfen önce "Not Girişi" sayfasından öğrencilerin sınav notlarını kaydediniz.`, 'Öğrenci Notu Bulunamadı', 'warning');
+        setLoading(false);
+        return;
+      }
 
       // dcExamSonuc[dc.code][examType] = { alinan, max }
       let dcExamSonuc = {};
@@ -471,10 +475,10 @@ export default function InstructorReports() {
         reqExams.forEach(et => { dcExamSonuc[d.code][et] = { alinan: 0, max: 0 }; });
       });
 
-      // Calculate class raw totals for outcomes (handling Büt/Final fallback per student)
+      // Calculate class raw totals for outcomes (handling Büt/Final fallback per student in combo mode)
       students.forEach(o => {
         reqExams.forEach(et => {
-          const effectiveExam = getEffectiveExamForStudent(o.id, et, questions, grades);
+          const effectiveExam = isComboMode ? getEffectiveExamForStudent(o.id, et, questions, grades) : et;
           const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
 
           examQuestions.forEach(q => {
@@ -524,8 +528,8 @@ export default function InstructorReports() {
         studentDcSuccess[o.id] = {};
         dcs.forEach(dc => {
           if (!isComboMode) {
-            const effectiveExam = getEffectiveExamForStudent(o.id, reqExams[0], questions, grades);
-            const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
+            const et = reqExams[0];
+            const examQuestions = questions.filter(q => q.expand?.exam?.type === et);
             let alinan = 0, max = 0;
             examQuestions.forEach(q => {
               const qDcCodes = getQuestionDcCodes(q);
