@@ -30,6 +30,25 @@ export default function InstructorReports() {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [allTerms, setAllTerms] = useState([]);
 
+  const examOrderPriority = {
+    'Vize': 1,
+    'Final': 2,
+    'Bütünleme': 3,
+    'Ödev': 4,
+    'Proje': 5,
+    'Sunum': 6,
+    'Uygulama': 7
+  };
+
+  const sortExamTypes = (types) => {
+    return [...types].sort((a, b) => {
+      const pA = examOrderPriority[a] || 99;
+      const pB = examOrderPriority[b] || 99;
+      if (pA !== pB) return pA - pB;
+      return a.localeCompare(b, 'tr');
+    });
+  };
+
   // Tab 1 State (Detaylı Analiz)
   const [analizData, setAnalizData] = useState(null);
   const [pcChartType, setPcChartType] = useState('bar'); // 'bar' (Sütun) | 'radar' (Radar)
@@ -1346,11 +1365,12 @@ export default function InstructorReports() {
                           <div
                             key={exam.type}
                             onClick={() => {
-                              setSelectedExamTypes(prev =>
-                                prev.includes(exam.type)
+                              setSelectedExamTypes(prev => {
+                                const next = prev.includes(exam.type)
                                   ? prev.filter(t => t !== exam.type)
-                                  : [...prev, exam.type]
-                              );
+                                  : [...prev, exam.type];
+                                return sortExamTypes(next);
+                              });
                             }}
                             className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none transition-all ${
                               isChecked
