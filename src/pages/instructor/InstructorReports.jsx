@@ -192,7 +192,23 @@ export default function InstructorReports() {
         }
       });
 
-      const list = Object.values(examMap);
+      const examOrderPriority = {
+        'Vize': 1,
+        'Final': 2,
+        'Bütünleme': 3,
+        'Ödev': 4,
+        'Proje': 5,
+        'Sunum': 6,
+        'Uygulama': 7
+      };
+
+      const list = Object.values(examMap).sort((a, b) => {
+        const pA = examOrderPriority[a.type] || 99;
+        const pB = examOrderPriority[b.type] || 99;
+        if (pA !== pB) return pA - pB;
+        return a.type.localeCompare(b.type, 'tr');
+      });
+
       setCourseExamsList(list);
 
       // Default selection: select all exams except Bütünleme (if other exams exist)
