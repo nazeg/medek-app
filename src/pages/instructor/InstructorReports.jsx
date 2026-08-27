@@ -355,20 +355,49 @@ export default function InstructorReports() {
         pb.collection('student_grades').getFullList({ filter: `exam.course = "${selectedCourse.id}"` })
       ]);
 
-      const students = rawStudents.filter(s => {
-        if (Array.isArray(s.courses) && s.courses.includes(selectedCourse.id)) return true;
-        if (grades.some(g => g.student === s.id)) return true;
-        return false;
-      });
-
-      pcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
-      dcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
-
       const reqExams = targetExams;
       const missingExams = reqExams.filter(exam => !questions.some(q => q.expand?.exam?.type === exam));
 
       if (missingExams.length > 0) {
         alert(`Analiz yapılamadı!\n"${displayModName}" kombinasyonunu hesaplayabilmek için şu sınav verileri eksik: ${missingExams.join(', ')}.\nLütfen önce bu sınavlara ait soruları ve notları tanımlayınız.`, 'Eksik Sınav Verisi', 'warning');
+        setLoading(false);
+        return;
+      }
+
+      // Filter questions relevant to the selected exams
+      const relevantQuestions = questions.filter(q => reqExams.includes(q.expand?.exam?.type));
+      const relevantQuestionIds = new Set(relevantQuestions.map(q => q.id));
+
+      // Sınava katılan öğrencileri belirle:
+      // Seçilen sınav(lar)da notu/cevabı girilmemiş (veya tüm soruları boş/0) olan devamsız öğrencileri rapora ve hesaplamaya dahil etme
+      const enrolledOrGraded = rawStudents.filter(s => {
+        if (Array.isArray(s.courses) && s.courses.includes(selectedCourse.id)) return true;
+        if (grades.some(g => g.student === s.id && relevantQuestionIds.has(g.question))) return true;
+        return false;
+      });
+
+      const students = enrolledOrGraded.filter(s => {
+        const studentGrades = grades.filter(g => g.student === s.id && relevantQuestionIds.has(g.question));
+        if (studentGrades.length === 0) return false;
+
+        // Çoktan seçmeli sınavlarda 1-5 arası (A-E) cevap verilmiş mi, ya da klasik sınavlarda puan girilmiş mi kontrol et
+        const hasValidSubmission = studentGrades.some(g => {
+          const q = relevantQuestions.find(rq => rq.id === g.question);
+          if (!q) return false;
+          if (q.type === 'Çoktan Seçmeli') {
+            return Number(g.score) >= 1 && Number(g.score) <= 5;
+          }
+          if (q.type === 'Doğru/Yanlış') {
+            return g.score === q.max_score || (g.score !== undefined && g.score !== null && g.score !== '' && Number(g.score) > 0);
+          }
+          return g.score !== undefined && g.score !== null && g.score !== '' && Number(g.score) > 0;
+        });
+
+        return hasValidSubmission;
+      });
+
+      if (students.length === 0) {
+        alert(`Seçilen sınav(lar) için notu/katılımı bulunan öğrenci bulunamadı. Lütfen önce "Not Girişi" sayfasından öğrencilerin sınav notlarını kaydediniz.`, 'Öğrenci Notu Bulunamadı', 'warning');
         setLoading(false);
         return;
       }
@@ -1965,24 +1994,31 @@ export default function InstructorReports() {
 
                                           let cellBg = '';
                                           let cellText = '—';
-                                          if (grade) {
-                                            if (score === q.max_score) {
-                                              cellBg = 'bg-[#d4edda] text-[#155724]';
-                                              if (q.type === 'Çoktan Seçmeli') {
-                                                const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
-                                                cellText = optionLetters[grade.score] || (q.answer || '✓');
+                                          if (grade && grade.score !== undefined && grade.score !== null && grade.score !== '') {
+                                            if (q.type === 'Çoktan Seçmeli') {
+                                              const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
+                                              const chosenLetter = optionLetters[grade.score];
+                                              if (grade.score >= 1 && grade.score <= 5) {
+                                                if (score === q.max_score) {
+                                                  cellBg = 'bg-[#d4edda] text-[#155724]';
+                                                  cellText = chosenLetter || (q.answer || '✓');
+                                                } else {
+                                                  cellBg = 'bg-[#f8d7da] text-[#721c24]';
+                                                  cellText = chosenLetter;
+                                                }
                                               } else {
-                                                cellText = q.type === 'Doğru/Yanlış' ? (q.answer || 'Doğru') : `${score}p`;
+                                                cellBg = '';
+                                                cellText = '—';
                                               }
-                                            } else if (score > 0) {
-                                              cellBg = 'bg-[#fff3cd] text-[#856404]';
-                                              cellText = `${score}p`;
                                             } else {
-                                              cellBg = 'bg-[#f8d7da] text-[#721c24]';
-                                              if (q.type === 'Çoktan Seçmeli') {
-                                                const optionLetters = ['', 'A', 'B', 'C', 'D', 'E'];
-                                                cellText = optionLetters[grade.score] || 'X';
+                                              if (score === q.max_score) {
+                                                cellBg = 'bg-[#d4edda] text-[#155724]';
+                                                cellText = q.type === 'Doğru/Yanlış' ? (q.answer || 'Doğru') : `${score}p`;
+                                              } else if (score > 0) {
+                                                cellBg = 'bg-[#fff3cd] text-[#856404]';
+                                                cellText = `${score}p`;
                                               } else {
+                                                cellBg = 'bg-[#f8d7da] text-[#721c24]';
                                                 cellText = q.type === 'Doğru/Yanlış' ? 'Yanlış' : '0p';
                                               }
                                             }
