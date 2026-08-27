@@ -350,6 +350,36 @@ export default function InstructorReports() {
     return Number(rawScore);
   };
 
+  const hasStudentTakenExam = (studentId, examType, allQ, allG) => {
+    if (!allQ || !allG) return false;
+    const examQuestions = allQ.filter(q => q.expand?.exam?.type === examType);
+    if (examQuestions.length === 0) return false;
+    const examQuestionIds = new Set(examQuestions.map(q => q.id));
+    const studentGrades = allG.filter(g => g.student === studentId && examQuestionIds.has(g.question));
+    
+    return studentGrades.some(g => {
+      const q = examQuestions.find(rq => rq.id === g.question);
+      if (!q) return false;
+      if (q.type === 'Çoktan Seçmeli') {
+        return Number(g.score) >= 1 && Number(g.score) <= 5;
+      }
+      if (q.type === 'Doğru/Yanlış') {
+        return g.score === q.max_score || (g.score !== undefined && g.score !== null && g.score !== '' && Number(g.score) > 0);
+      }
+      return g.score !== undefined && g.score !== null && g.score !== '' && Number(g.score) > 0;
+    });
+  };
+
+  const getEffectiveExamForStudent = (studentId, examType, allQ, allG) => {
+    if (examType === 'Bütünleme') {
+      const tookBut = hasStudentTakenExam(studentId, 'Bütünleme', allQ, allG);
+      if (tookBut) return 'Bütünleme';
+      const tookFinal = hasStudentTakenExam(studentId, 'Final', allQ, allG);
+      if (tookFinal) return 'Final';
+    }
+    return examType;
+  };
+
   const calculateCourseAnalysis = async (modParam) => {
     if (!selectedCourse) {
       alert('Lütfen bir ders seçiniz.', 'Uyarı', 'warning');
@@ -392,7 +422,7 @@ export default function InstructorReports() {
       const relevantQuestionIds = new Set(relevantQuestions.map(q => q.id));
 
       // Sınava katılan öğrencileri belirle:
-      // Seçilen sınav(lar)da notu/cevabı girilmemiş (veya tüm soruları boş/0) olan devamsız öğrencileri rapora ve hesaplamaya dahil etme
+      // Seçilen sınav(lar)da notu/cevabı girilmemiş (veya Bütünleme kombinasyonunda Final notu da olmayan) devamsız öğrencileri rapora dahil etme
       const enrolledOrGraded = rawStudents.filter(s => {
         if (Array.isArray(s.courses) && s.courses.includes(selectedCourse.id)) return true;
         if (grades.some(g => g.student === s.id && relevantQuestionIds.has(g.question))) return true;
@@ -400,23 +430,11 @@ export default function InstructorReports() {
       });
 
       const students = enrolledOrGraded.filter(s => {
-        const studentGrades = grades.filter(g => g.student === s.id && relevantQuestionIds.has(g.question));
-        if (studentGrades.length === 0) return false;
-
-        // Çoktan seçmeli sınavlarda 1-5 arası (A-E) cevap verilmiş mi, ya da klasik sınavlarda puan girilmiş mi kontrol et
-        const hasValidSubmission = studentGrades.some(g => {
-          const q = relevantQuestions.find(rq => rq.id === g.question);
-          if (!q) return false;
-          if (q.type === 'Çoktan Seçmeli') {
-            return Number(g.score) >= 1 && Number(g.score) <= 5;
-          }
-          if (q.type === 'Doğru/Yanlış') {
-            return g.score === q.max_score || (g.score !== undefined && g.score !== null && g.score !== '' && Number(g.score) > 0);
-          }
-          return g.score !== undefined && g.score !== null && g.score !== '' && Number(g.score) > 0;
+        return reqExams.some(et => {
+          if (hasStudentTakenExam(s.id, et, questions, grades)) return true;
+          if (et === 'Bütünleme' && hasStudentTakenExam(s.id, 'Final', questions, grades)) return true;
+          return false;
         });
-
-        return hasValidSubmission;
       });
 
       if (students.length === 0) {
@@ -449,22 +467,25 @@ export default function InstructorReports() {
         reqExams.forEach(et => { dcExamSonuc[d.code][et] = { alinan: 0, max: 0 }; });
       });
 
-      // Calculate class raw totals for outcomes
+      // Calculate class raw totals for outcomes (handling Büt/Final fallback per student)
       students.forEach(o => {
-        questions.forEach(q => {
-          const examType = q.expand?.exam?.type;
-          if (!reqExams.includes(examType)) return;
-          const qDcCodes = getQuestionDcCodes(q);
-          if (qDcCodes.length === 0) return;
+        reqExams.forEach(et => {
+          const effectiveExam = getEffectiveExamForStudent(o.id, et, questions, grades);
+          const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
 
-          const grade = grades.find(g => g.student === o.id && g.question === q.id);
-          const score = getQuestionScore(q, grade);
+          examQuestions.forEach(q => {
+            const qDcCodes = getQuestionDcCodes(q);
+            if (qDcCodes.length === 0) return;
 
-          qDcCodes.forEach(code => {
-            if (dcExamSonuc[code] && dcExamSonuc[code][examType]) {
-              dcExamSonuc[code][examType].alinan += Number(score);
-              dcExamSonuc[code][examType].max += Number(q.max_score);
-            }
+            const grade = grades.find(g => g.student === o.id && g.question === q.id);
+            const score = getQuestionScore(q, grade);
+
+            qDcCodes.forEach(code => {
+              if (dcExamSonuc[code] && dcExamSonuc[code][et]) {
+                dcExamSonuc[code][et].alinan += Number(score);
+                dcExamSonuc[code][et].max += Number(q.max_score);
+              }
+            });
           });
         });
       });
@@ -483,8 +504,9 @@ export default function InstructorReports() {
             const { alinan, max } = dcExamSonuc[dc.code][et] || { alinan: 0, max: 0 };
             if (max > 0) {
               const examBasari = (alinan / max) * 100;
-              weightedSum += examBasari * (pctMap[et] || 0);
-              usedWeightSum += (pctMap[et] || 0);
+              const w = (pctMap[et] !== undefined && pctMap[et] > 0) ? pctMap[et] : (100 / reqExams.length);
+              weightedSum += examBasari * w;
+              usedWeightSum += w;
             }
           });
           dcAssessed[dc.code] = usedWeightSum > 0;
@@ -498,38 +520,37 @@ export default function InstructorReports() {
         studentDcSuccess[o.id] = {};
         dcs.forEach(dc => {
           if (!isComboMode) {
+            const effectiveExam = getEffectiveExamForStudent(o.id, reqExams[0], questions, grades);
+            const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
             let alinan = 0, max = 0;
-            questions.forEach(q => {
-              const examType = q.expand?.exam?.type;
-              if (examType === reqExams[0]) {
-                const qDcCodes = getQuestionDcCodes(q);
-                if (qDcCodes.includes(dc.code)) {
-                  const grade = grades.find(g => g.student === o.id && g.question === q.id);
-                  alinan += getQuestionScore(q, grade);
-                  max += q.max_score;
-                }
+            examQuestions.forEach(q => {
+              const qDcCodes = getQuestionDcCodes(q);
+              if (qDcCodes.includes(dc.code)) {
+                const grade = grades.find(g => g.student === o.id && g.question === q.id);
+                alinan += getQuestionScore(q, grade);
+                max += q.max_score;
               }
             });
             studentDcSuccess[o.id][dc.code] = max > 0 ? (alinan / max) * 100 : 0;
           } else {
             let weightedSum = 0, usedWeightSum = 0;
             reqExams.forEach(et => {
+              const effectiveExam = getEffectiveExamForStudent(o.id, et, questions, grades);
+              const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
               let alinan = 0, max = 0;
-              questions.forEach(q => {
-                const examType = q.expand?.exam?.type;
-                if (examType === et) {
-                  const qDcCodes = getQuestionDcCodes(q);
-                  if (qDcCodes.includes(dc.code)) {
-                    const grade = grades.find(g => g.student === o.id && g.question === q.id);
-                    alinan += getQuestionScore(q, grade);
-                    max += q.max_score;
-                  }
+              examQuestions.forEach(q => {
+                const qDcCodes = getQuestionDcCodes(q);
+                if (qDcCodes.includes(dc.code)) {
+                  const grade = grades.find(g => g.student === o.id && g.question === q.id);
+                  alinan += getQuestionScore(q, grade);
+                  max += q.max_score;
                 }
               });
               if (max > 0) {
                 const examBasari = (alinan / max) * 100;
-                weightedSum += examBasari * (pctMap[et] || 0);
-                usedWeightSum += (pctMap[et] || 0);
+                const w = (pctMap[et] !== undefined && pctMap[et] > 0) ? pctMap[et] : (100 / reqExams.length);
+                weightedSum += examBasari * w;
+                usedWeightSum += w;
               }
             });
             studentDcSuccess[o.id][dc.code] = usedWeightSum > 0 ? weightedSum / usedWeightSum : 0;
@@ -626,6 +647,7 @@ export default function InstructorReports() {
         dcs,
         matrix,
         questions: filteredQuestions,
+        allQuestions: questions,
         students,
         grades,
         reqExams,
@@ -1852,12 +1874,19 @@ export default function InstructorReports() {
                   // Pre-calculate whole-class averages
                   let totalComboWeighted = 0;
                   const termSums = {};
+                  let totalSelectedWeight = analizData.reqExams.reduce((s, et) => {
+                    const w = (analizData.pctMap[et] !== undefined && analizData.pctMap[et] > 0) ? analizData.pctMap[et] : (100 / analizData.reqExams.length);
+                    return s + w;
+                  }, 0);
+                  if (totalSelectedWeight === 0) totalSelectedWeight = 100;
+
                   if (isCombo) {
                     analizData.reqExams.forEach(et => { termSums[et] = { sum: 0, count: 0 }; });
                     analizData.students.forEach(o => {
                       let rowWeighted = 0;
                       analizData.reqExams.forEach(et => {
-                        const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                        const effectiveExam = getEffectiveExamForStudent(o.id, et, analizData.allQuestions || analizData.questions, analizData.grades);
+                        const examQuestions = (analizData.allQuestions || analizData.questions).filter(q => q.expand?.exam?.type === effectiveExam);
                         const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
                         let obtained = 0;
                         examQuestions.forEach(q => {
@@ -1865,9 +1894,13 @@ export default function InstructorReports() {
                           obtained += getQuestionScore(q, grade);
                         });
                         const rawPercent = examMax > 0 ? (obtained / examMax) * 100 : 0;
-                        rowWeighted += (rawPercent * analizData.pctMap[et]) / 100;
-                        termSums[et].sum += rawPercent;
-                        termSums[et].count++;
+                        const w = (analizData.pctMap[et] !== undefined && analizData.pctMap[et] > 0) ? analizData.pctMap[et] : (100 / analizData.reqExams.length);
+                        const weightedVal = (rawPercent * w) / totalSelectedWeight;
+                        rowWeighted += weightedVal;
+                        if (examMax > 0 && (obtained > 0 || hasStudentTakenExam(o.id, effectiveExam, analizData.allQuestions || analizData.questions, analizData.grades))) {
+                          termSums[et].sum += rawPercent;
+                          termSums[et].count++;
+                        }
                       });
                       totalComboWeighted += rowWeighted;
                     });
@@ -1955,7 +1988,9 @@ export default function InstructorReports() {
                                         <td className="px-3 py-1.5 font-bold font-mono whitespace-nowrap">{o.number}</td>
                                         <td className="px-3 py-1.5 font-semibold whitespace-nowrap">{o.name}</td>
                                         {analizData.reqExams.map(et => {
-                                          const examQuestions = analizData.questions.filter(q => q.expand?.exam?.type === et);
+                                          const effectiveExam = getEffectiveExamForStudent(o.id, et, analizData.allQuestions || analizData.questions, analizData.grades);
+                                          const isFallbackFinal = et === 'Bütünleme' && effectiveExam === 'Final';
+                                          const examQuestions = (analizData.allQuestions || analizData.questions).filter(q => q.expand?.exam?.type === effectiveExam);
                                           const examMax = examQuestions.reduce((s, q) => s + q.max_score, 0);
                                           let obtained = 0;
                                           examQuestions.forEach(q => {
@@ -1963,13 +1998,17 @@ export default function InstructorReports() {
                                             obtained += getQuestionScore(q, grade);
                                           });
                                           const rawPercent = examMax > 0 ? (obtained / examMax) * 100 : 0;
-                                          const weightedVal = (rawPercent * analizData.pctMap[et]) / 100;
+                                          const w = (analizData.pctMap[et] !== undefined && analizData.pctMap[et] > 0) ? analizData.pctMap[et] : (100 / analizData.reqExams.length);
+                                          const weightedVal = (rawPercent * w) / totalSelectedWeight;
                                           rowWeighted += weightedVal;
 
                                           return (
                                             <Fragment key={et}>
                                               <td className={`px-2 py-1.5 text-center font-bold ${getColorByValue(rawPercent)}`}>
                                                 {rawPercent.toFixed(1)}
+                                                {isFallbackFinal && (
+                                                  <span className="block text-[8.5px] font-medium text-amber-700 leading-none mt-0.5" title="Bütünlemeye girmediği için Final notu baz alınmıştır">(Final)</span>
+                                                )}
                                               </td>
                                               <td className="px-2 py-1.5 text-center font-semibold bg-slate-50/30 text-slate-500">
                                                 {weightedVal.toFixed(1)}
@@ -1987,8 +2026,9 @@ export default function InstructorReports() {
                                     <tr className={`bg-slate-100 font-bold border-t border-outline-variant ${isExportingPDF ? '' : 'sticky bottom-0'}`}>
                                       <td colSpan={2} className="px-3 py-2.5 text-right whitespace-nowrap">Sınıf Ortalaması:</td>
                                       {analizData.reqExams.map(et => {
-                                        const avgRaw = termSums[et].count > 0 ? termSums[et].sum / termSums[et].count : 0;
-                                        const avgWeightedTerm = (avgRaw * analizData.pctMap[et]) / 100;
+                                        const avgRaw = termSums[et]?.count > 0 ? termSums[et].sum / termSums[et].count : 0;
+                                        const w = (analizData.pctMap[et] !== undefined && analizData.pctMap[et] > 0) ? analizData.pctMap[et] : (100 / analizData.reqExams.length);
+                                        const avgWeightedTerm = (avgRaw * w) / totalSelectedWeight;
                                         return (
                                           <Fragment key={et}>
                                             <td className="px-2 py-2.5 text-center text-on-surface">{avgRaw.toFixed(1)}</td>
