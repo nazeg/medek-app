@@ -34,6 +34,9 @@ export default function InstructorReports() {
   const [analizData, setAnalizData] = useState(null);
   const [pcChartType, setPcChartType] = useState('bar'); // 'bar' (Sütun) | 'radar' (Radar)
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [courseExamsList, setCourseExamsList] = useState([]);
+  const [selectedExamTypes, setSelectedExamTypes] = useState([]);
+  const [loadingExams, setLoadingExams] = useState(false);
 
   // Tab 2 State (Program PÇ Raporu)
   const [cohortMatrix, setCohortMatrix] = useState({});
@@ -121,6 +124,90 @@ export default function InstructorReports() {
     });
   }, [user, activeProgram]);
 
+  // Load available exams and questions for selectedCourse
+  useEffect(() => {
+    if (!selectedCourse) {
+      setCourseExamsList([]);
+      setSelectedExamTypes([]);
+      setAnalizData(null);
+      return;
+    }
+
+    setLoadingExams(true);
+    setAnalizData(null);
+
+    Promise.all([
+      pb.collection('exams').getFullList({
+        filter: `course = "${selectedCourse.id}"`,
+        sort: 'type'
+      }),
+      pb.collection('questions').getFullList({
+        filter: `exam.course = "${selectedCourse.id}"`,
+        expand: 'exam'
+      })
+    ]).then(([exams, questions]) => {
+      const examMap = {};
+
+      const weightMap = {
+        'Vize': selectedCourse.pct_vize ?? 40,
+        'Final': selectedCourse.pct_final ?? 60,
+        'Bütünleme': selectedCourse.pct_but ?? 60,
+        'Ödev': selectedCourse.pct_odev ?? 0,
+        'Proje': selectedCourse.pct_proje ?? 0,
+        'Sunum': selectedCourse.pct_sunum ?? 0,
+        'Uygulama': selectedCourse.pct_uygulama ?? 0,
+      };
+      if (Array.isArray(selectedCourse.custom_weights)) {
+        selectedCourse.custom_weights.forEach(cw => {
+          if (cw.name) weightMap[cw.name] = cw.percentage ?? 0;
+        });
+      }
+
+      exams.forEach(e => {
+        if (e.type) {
+          const qList = questions.filter(q => q.expand?.exam?.id === e.id || q.expand?.exam?.type === e.type);
+          const maxPoints = qList.reduce((s, q) => s + (q.max_score || 0), 0);
+          examMap[e.type] = {
+            type: e.type,
+            id: e.id,
+            qCount: qList.length,
+            maxPoints,
+            weight: weightMap[e.type] ?? 0
+          };
+        }
+      });
+
+      questions.forEach(q => {
+        const t = q.expand?.exam?.type;
+        if (t && !examMap[t]) {
+          const qList = questions.filter(x => x.expand?.exam?.type === t);
+          const maxPoints = qList.reduce((s, x) => s + (x.max_score || 0), 0);
+          examMap[t] = {
+            type: t,
+            id: q.expand?.exam?.id,
+            qCount: qList.length,
+            maxPoints,
+            weight: weightMap[t] ?? 0
+          };
+        }
+      });
+
+      const list = Object.values(examMap);
+      setCourseExamsList(list);
+
+      // Default selection: select all exams except Bütünleme (if other exams exist)
+      const nonButExams = list.filter(e => e.type !== 'Bütünleme');
+      const defaultTypes = nonButExams.length > 0 ? nonButExams.map(e => e.type) : list.map(e => e.type);
+      setSelectedExamTypes(defaultTypes);
+    }).catch(err => {
+      console.error('Error loading course exams:', err);
+      setCourseExamsList([]);
+      setSelectedExamTypes([]);
+    }).finally(() => {
+      setLoadingExams(false);
+    });
+  }, [selectedCourse]);
+
   // Handle program cohort matrix generation
   useEffect(() => {
     if (activeTab !== 'program') return;
@@ -205,11 +292,21 @@ export default function InstructorReports() {
     return Number(rawScore);
   };
 
-  const calculateCourseAnalysis = async (modName) => {
+  const calculateCourseAnalysis = async (modParam) => {
     if (!selectedCourse) {
       alert('Lütfen bir ders seçiniz.', 'Uyarı', 'warning');
       return;
     }
+    const targetExams = Array.isArray(modParam) ? modParam : getRequiredExamsByMod(modParam);
+    if (!targetExams || targetExams.length === 0) {
+      alert('Lütfen değerlendirmeye dahil etmek için en az bir sınav seçiniz.', 'Uyarı', 'warning');
+      return;
+    }
+
+    const displayModName = Array.isArray(modParam)
+      ? (modParam.length === 1 ? modParam[0] : modParam.join(' + '))
+      : modParam;
+
     setLoading(true);
     try {
       const programId = selectedCourse.program;
@@ -232,11 +329,11 @@ export default function InstructorReports() {
       pcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
       dcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
 
-      const reqExams = getRequiredExamsByMod(modName);
+      const reqExams = targetExams;
       const missingExams = reqExams.filter(exam => !questions.some(q => q.expand?.exam?.type === exam));
 
       if (missingExams.length > 0) {
-        alert(`Analiz yapılamadı!\n"${modName}" kombinasyonunu hesaplayabilmek için şu sınav verileri eksik: ${missingExams.join(', ')}.\nLütfen önce bu sınavlara ait soruları ve notları tanımlayınız.`, 'Eksik Sınav Verisi', 'warning');
+        alert(`Analiz yapılamadı!\n"${displayModName}" kombinasyonunu hesaplayabilmek için şu sınav verileri eksik: ${missingExams.join(', ')}.\nLütfen önce bu sınavlara ait soruları ve notları tanımlayınız.`, 'Eksik Sınav Verisi', 'warning');
         setLoading(false);
         return;
       }
@@ -437,7 +534,7 @@ export default function InstructorReports() {
       const hardQuestions = questionStats.filter(s => s.success < 20);
 
       setAnalizData({
-        modName,
+        modName: displayModName,
         pcs,
         dcs,
         matrix,
@@ -1183,67 +1280,121 @@ export default function InstructorReports() {
 
             {selectedCourse && (
               <div className="mt-6 border-t border-outline-variant pt-6 space-y-4">
-                <div>
-                  <h5 className="text-xs font-bold text-on-surface-variant mb-2.5">📊 Tekil Sınav Analizleri</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      'Vize', 'Final', 'Ödev', 'Proje', 'Sunum', 'Uygulama', 'Bütünleme',
-                      ...((selectedCourse?.custom_weights || []).map(cw => cw.name).filter(Boolean))
-                    ].map(mod => (
-                      <button
-                        key={mod}
-                        onClick={() => calculateCourseAnalysis(mod)}
-                        className="px-3.5 py-2 bg-surface hover:bg-primary/5 text-on-surface hover:text-primary rounded-lg text-xs font-bold border border-outline-variant hover:border-primary/20 transition-all"
-                      >
-                        {mod}
-                      </button>
-                    ))}
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-base">checklist</span>
+                      Değerlendirmeye Dahil Edilecek Sınavlar
+                    </h4>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      Raporda birleştirmek veya tekli incelemek istediğiniz sınavları seçiniz.
+                    </p>
                   </div>
+
+                  {courseExamsList.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedExamTypes(courseExamsList.map(e => e.type))}
+                        className="text-[11px] font-bold text-primary hover:underline px-2.5 py-1 bg-primary/5 hover:bg-primary/10 rounded-md transition-all cursor-pointer"
+                      >
+                        Tümünü Seç
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedExamTypes([])}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-700 hover:underline px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md transition-all cursor-pointer"
+                      >
+                        Temizle
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <h5 className="text-xs font-bold text-on-surface-variant mb-2.5">🔄 Sınav Kombinasyonları</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { key: 'VizeFinal', label: 'Vize + Final' },
-                      { key: 'ÖdevFinal', label: 'Ödev + Final' },
-                      { key: 'UygulamaFinal', label: 'Uygulama + Final' },
-                      { key: 'VizeÖdevFinal', label: 'Vize + Ödev + Final' },
-                      { key: 'VizeUygulamaFinal', label: 'Vize + Uygulama + Final' },
-                      { key: 'VizeÖdevUygulamaFinal', label: 'Hepsi (V+Ö+U+F)' }
-                    ].map(combo => (
-                      <button
-                        key={combo.key}
-                        onClick={() => calculateCourseAnalysis(combo.key)}
-                        className="px-3.5 py-2 bg-surface hover:bg-secondary/5 text-on-surface hover:text-secondary rounded-lg text-xs font-bold border border-outline-variant hover:border-secondary/20 transition-all"
-                      >
-                        {combo.label}
-                      </button>
-                    ))}
+                {loadingExams ? (
+                  <div className="py-6 flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+                    Sınav bilgileri yükleniyor...
                   </div>
-                </div>
+                ) : courseExamsList.length === 0 ? (
+                  <div className="p-4 border border-dashed border-outline-variant rounded-xl text-center text-xs text-slate-500 font-medium bg-slate-50/50">
+                    Bu derse ait henüz tanımlanmış sınav veya soru bulunamadı. Lütfen önce "Sınav Planı" veya "Not Girişi" sayfasından sınavlarınızı tanımlayınız.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {courseExamsList.map(exam => {
+                        const isChecked = selectedExamTypes.includes(exam.type);
+                        return (
+                          <div
+                            key={exam.type}
+                            onClick={() => {
+                              setSelectedExamTypes(prev =>
+                                prev.includes(exam.type)
+                                  ? prev.filter(t => t !== exam.type)
+                                  : [...prev, exam.type]
+                              );
+                            }}
+                            className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none transition-all ${
+                              isChecked
+                                ? 'bg-blue-50/60 border-primary ring-1 ring-primary shadow-xs'
+                                : 'bg-white border-outline-variant hover:border-slate-300 hover:bg-slate-50/50 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}} // handled by parent onClick
+                              className="mt-0.5 rounded text-primary focus:ring-0 focus:ring-transparent h-4 w-4 border-slate-300 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={`text-xs font-bold ${isChecked ? 'text-primary' : 'text-on-surface'}`}>
+                                  {exam.type}
+                                </span>
+                                {exam.weight > 0 && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                    %{exam.weight}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
+                                <span>{exam.qCount} Soru</span>
+                                {exam.maxPoints > 0 && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{exam.maxPoints} Puan</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                <div>
-                  <h5 className="text-xs font-bold text-on-surface-variant mb-2.5">🕒 Bütünleme Kombinasyonları</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { key: 'VizeBüt', label: 'Vize + Büt' },
-                      { key: 'ÖdevBüt', label: 'Ödev + Büt' },
-                      { key: 'UygulamaBüt', label: 'Uygulama + Büt' },
-                      { key: 'VizeÖdevBüt', label: 'V+Ö+B' },
-                      { key: 'VizeUygulamaBüt', label: 'V+U+B' },
-                      { key: 'VizeÖdevUygulamaBüt', label: 'Hepsi (V+Ö+U+B)' }
-                    ].map(combo => (
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
+                      <div className="text-xs text-slate-500 font-medium">
+                        {selectedExamTypes.length > 0 ? (
+                          <span>Seçilen: <strong className="text-primary font-bold">{selectedExamTypes.join(' + ')}</strong> ({selectedExamTypes.length} sınav)</span>
+                        ) : (
+                          <span className="text-amber-600 font-semibold">Lütfen değerlendirmeye dahil etmek için en az bir sınav seçiniz.</span>
+                        )}
+                      </div>
+
                       <button
-                        key={combo.key}
-                        onClick={() => calculateCourseAnalysis(combo.key)}
-                        className="px-3.5 py-2 bg-surface hover:bg-tertiary/5 text-on-surface hover:text-tertiary rounded-lg text-xs font-bold border border-outline-variant hover:border-tertiary/20 transition-all"
+                        type="button"
+                        disabled={selectedExamTypes.length === 0 || loading}
+                        onClick={() => calculateCourseAnalysis(selectedExamTypes)}
+                        className="px-5 py-2.5 bg-primary hover:bg-primary-container disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-md shadow-primary/20 transition-all active:scale-95 cursor-pointer"
                       >
-                        {combo.label}
+                        <span className="material-symbols-outlined text-base">query_stats</span>
+                        Raporu Oluştur
                       </button>
-                    ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>
