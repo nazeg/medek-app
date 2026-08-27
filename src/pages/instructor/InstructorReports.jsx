@@ -296,6 +296,29 @@ export default function InstructorReports() {
     return (Array.isArray(outcomes) ? outcomes : [outcomes]).map(o => o.code);
   };
 
+  const getQuestionPcCodes = (q) => {
+    if (!analizData || !analizData.matrix || !analizData.pcs) return [];
+    const outcomes = q.expand?.course_outcome || q.course_outcome;
+    if (!outcomes) return [];
+    const dcArray = Array.isArray(outcomes) ? outcomes : [outcomes];
+    const dcIds = dcArray.map(d => (typeof d === 'object' && d !== null ? d.id : d)).filter(Boolean);
+    const dcCodes = dcArray.map(d => (typeof d === 'object' && d !== null ? d.code : null)).filter(Boolean);
+    
+    const matchedDcIds = (analizData.dcs || []).filter(dc => dcIds.includes(dc.id) || dcCodes.includes(dc.code)).map(dc => dc.id);
+    const allTargetDcIds = [...new Set([...dcIds, ...matchedDcIds])];
+
+    const relatedPcIds = new Set();
+    (analizData.matrix || []).forEach(m => {
+      if (allTargetDcIds.includes(m.dc) && Number(m.level) > 0) {
+        relatedPcIds.add(m.pc);
+      }
+    });
+
+    const matchingPcs = (analizData.pcs || []).filter(p => relatedPcIds.has(p.id));
+    matchingPcs.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+    return matchingPcs.map(p => p.code);
+  };
+
   const getColorByValue = (val) => {
     if (val >= 70) return 'text-[#006c49] bg-[#e8f5e9]';
     if (val >= 50) return 'text-[#825100] bg-[#fff3e0]';
@@ -1654,23 +1677,42 @@ export default function InstructorReports() {
                             <thead>
                               <tr className="bg-slate-50/50 border-b border-slate-200 font-semibold text-slate-600">
                                 <th className="px-2.5 py-1.5 text-center w-12">Kod</th>
-                                <th className="px-2.5 py-1.5">Tür</th>
+                                <th className="px-2.5 py-1.5 w-16">Tür</th>
                                 <th className="px-2.5 py-1.5 text-center">DÇ</th>
-                                <th className="px-2.5 py-1.5 text-center w-16">Puan</th>
-                                <th className="px-2.5 py-1.5 text-center w-16">Cevap</th>
+                                <th className="px-2.5 py-1.5 text-center">İlişkili PÇ</th>
+                                <th className="px-2.5 py-1.5 text-center w-14">Puan</th>
+                                <th className="px-2.5 py-1.5 text-center w-14">Cevap</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {list.map(q => {
                                 const qDcs = getQuestionDcCodes(q);
+                                const qPcs = getQuestionPcCodes(q);
                                 return (
                                   <tr key={q.id} className="hover:bg-slate-50/50">
                                     <td className="px-2.5 py-1.5 font-bold text-center font-mono">{q.code || `S${q.number}`}</td>
-                                    <td className="px-2.5 py-1.5 text-slate-600 font-medium">{q.type}</td>
+                                    <td className="px-2.5 py-1.5 text-slate-600 font-medium whitespace-nowrap">{q.type}</td>
                                     <td className="px-2.5 py-1.5 text-center">
-                                      {qDcs.map(code => (
-                                        <span key={code} className="inline-flex items-center justify-center bg-[#0058be]/10 text-[#0058be] px-1.5 py-0.5 rounded text-[10px] font-bold mx-0.5 leading-none">{code}</span>
-                                      ))}
+                                      {qDcs.length > 0 ? (
+                                        <div className="flex flex-wrap items-center justify-center gap-1">
+                                          {qDcs.map(code => (
+                                            <span key={code} className="inline-flex items-center justify-center bg-[#0058be]/10 text-[#0058be] px-1.5 py-0.5 rounded text-[10px] font-bold leading-none">{code}</span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-300">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-2.5 py-1.5 text-center">
+                                      {qPcs.length > 0 ? (
+                                        <div className="flex flex-wrap items-center justify-center gap-1">
+                                          {qPcs.map(code => (
+                                            <span key={code} className="inline-flex items-center justify-center bg-[#006c49]/10 text-[#006c49] px-1.5 py-0.5 rounded text-[10px] font-bold leading-none">{code}</span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-300">—</span>
+                                      )}
                                     </td>
                                     <td className="px-2.5 py-1.5 font-bold text-center">{q.max_score}</td>
                                     <td className="px-2.5 py-1.5 text-center text-[#006c49] font-bold">{q.answer || '—'}</td>
