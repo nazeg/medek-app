@@ -20,14 +20,16 @@ export function ProgramProvider({ children }) {
     
     try {
       let list = [];
-      if (user.role === 'coordinator' || user.role === 'program_head') {
+      if (user.role === 'program_head') {
         list = await pb.collection('programs').getFullList({ 
           sort: 'name',
           filter: `head = "${user.id}"`
         });
-        if (list.length === 0) {
-          list = await pb.collection('programs').getFullList({ sort: 'name' });
-        }
+      } else if (user.role === 'coordinator') {
+        list = await pb.collection('programs').getFullList({ 
+          sort: 'name',
+          filter: user.faculty ? `faculty = "${user.faculty}"` : undefined
+        });
       } else if (user.role === 'instructor') {
         const coursesList = await pb.collection('courses').getFullList({
           filter: `instructor ~ "${user.id}" || instructor ?= "${user.id}"`,

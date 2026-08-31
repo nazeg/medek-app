@@ -131,12 +131,43 @@ export default function InstructorReports() {
 
   useEffect(() => {
     if (!user) return;
-    pb.collection('programs').getFullList({ sort: 'name' }).then(list => {
+
+    let progPromise;
+    if (user.role === 'program_head') {
+      progPromise = pb.collection('programs').getFullList({
+        sort: 'name',
+        filter: `head = "${user.id}"`
+      });
+    } else if (user.role === 'coordinator') {
+      progPromise = pb.collection('programs').getFullList({
+        sort: 'name',
+        filter: user.faculty ? `faculty = "${user.faculty}"` : undefined
+      });
+    } else if (user.role === 'instructor') {
+      progPromise = pb.collection('courses').getFullList({
+        filter: `instructor ~ "${user.id}" || instructor ?= "${user.id}"`,
+        expand: 'program'
+      }).then(courses => {
+        const pMap = {};
+        courses.forEach(c => {
+          if (c.expand?.program) {
+            pMap[c.expand.program.id] = c.expand.program;
+          }
+        });
+        return Object.values(pMap).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+      });
+    } else {
+      progPromise = pb.collection('programs').getFullList({ sort: 'name' });
+    }
+
+    progPromise.then(list => {
       setProgramsList(list);
-      if (activeProgram) {
-        setSelectedProgram(list.find(p => p.id === activeProgram.id) || list[0]);
+      if (activeProgram && list.some(p => p.id === activeProgram.id)) {
+        setSelectedProgram(list.find(p => p.id === activeProgram.id));
       } else if (list.length > 0) {
         setSelectedProgram(list[0]);
+      } else {
+        setSelectedProgram(null);
       }
     }).catch(err => {
       console.error('Error loading programs:', err);
@@ -249,7 +280,7 @@ export default function InstructorReports() {
     pb.collection('terms').getFullList({ sort: '-name' }).then(terms => {
       setAllTerms(terms);
       const initialMatrix = {};
-      const grades = ['1', '2', '3', '4'];
+      const grades = ['1', '2', '3', '4', '5', '6'];
       terms.forEach(t => {
         grades.forEach(g => {
           initialMatrix[`${t.id}_${g}`] = false;
@@ -2572,8 +2603,8 @@ export default function InstructorReports() {
                       <thead>
                         <tr className="bg-slate-50 border-b border-outline-variant">
                           <th className="px-4 py-3 font-bold text-on-surface-variant">Dönem</th>
-                          {['1', '2', '3', '4'].map(g => (
-                            <th key={g} className="px-4 py-3 text-center font-bold text-on-surface-variant w-32">{g}. Sınıf</th>
+                          {['1', '2', '3', '4', '5', '6'].map(g => (
+                            <th key={g} className="px-3 py-3 text-center font-bold text-on-surface-variant w-24">{g}. Sınıf</th>
                           ))}
                         </tr>
                       </thead>
@@ -2589,12 +2620,12 @@ export default function InstructorReports() {
                             return (
                               <tr key={termId} className="hover:bg-slate-50/50">
                                 <td className="px-4 py-3 font-bold text-on-surface">{termObj.name || termId}</td>
-                                {['1', '2', '3', '4'].map(g => {
+                                {['1', '2', '3', '4', '5', '6'].map(g => {
                                   const key = `${termId}_${g}`;
                                   const isChecked = cohortMatrix[key] || false;
                                   return (
-                                    <td key={g} className="px-4 py-2.5 text-center">
-                                      <label className={`inline-flex items-center justify-center gap-1.5 px-4 py-1.5 border rounded-full cursor-pointer font-bold transition-all text-[11px] select-none ${isChecked ? 'bg-[#fff9db] border-[#fab005] text-[#f59f00]' : 'bg-white border-outline-variant text-slate-500 hover:border-primary/30'}`}>
+                                    <td key={g} className="px-3 py-2.5 text-center">
+                                      <label className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 border rounded-full cursor-pointer font-bold transition-all text-[11px] select-none ${isChecked ? 'bg-[#fff9db] border-[#fab005] text-[#f59f00]' : 'bg-white border-outline-variant text-slate-500 hover:border-primary/30'}`}>
                                         <input
                                           type="checkbox"
                                           checked={isChecked}
