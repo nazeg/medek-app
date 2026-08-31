@@ -5,6 +5,7 @@ import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
 import { useActiveCourse } from '../../contexts/CourseContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Grades() {
   const { alert, confirm } = useAlertConfirm();
@@ -182,6 +183,13 @@ export default function Grades() {
       }
 
       setDirtyGrades(new Set());
+      const selectedExamObj = exams.find(e => e.id === selectedExam);
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.GRADE,
+        details: `"${activeCourse?.code} - ${activeCourse?.name}" dersinin "${selectedExamObj?.type || 'Sınav'}" sınavı için ${dirtyKeys.length} adet öğrenci notu güncellendi/kaydedildi.`,
+        metadata: { course: activeCourse?.name, exam: selectedExamObj?.type, count: dirtyKeys.length }
+      });
       alert('Notlar başarıyla kaydedildi.', 'Başarılı', 'success');
     } catch (err) {
       console.error('Error saving grades:', err);
@@ -217,6 +225,12 @@ export default function Grades() {
         setShowAddStudentModal(false);
         setStudentForm({ number: '', name: '', email: '', id: null });
         await loadStudentsForCourse(activeCourse.id);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.STUDENT,
+          details: `"${name}" (${num}) isimli öğrencinin bilgileri güncellendi.`,
+          metadata: { studentId: studentForm.id, number: num, name }
+        });
         alert('Öğrenci bilgileri başarıyla güncellendi.', 'Başarılı', 'success');
         return;
       }
@@ -241,14 +255,27 @@ export default function Grades() {
         setShowAddStudentModal(false);
         setStudentForm({ number: '', name: '', email: '', id: null });
         await loadStudentsForCourse(activeCourse.id);
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.STUDENT,
+          details: `"${existing.name}" (${num}) isimli öğrenci "${activeCourse?.code} - ${activeCourse?.name}" dersine eklendi.`,
+          metadata: { studentId: existing.id, number: num, course: activeCourse?.name }
+        });
         alert(`Sistemde kayıtlı olan "${existing.name}" (${num}) bu derse başarıyla eklendi.`, 'Başarılı', 'success');
         return;
       } else {
-        await pb.collection('students').create({
+        const newSt = await pb.collection('students').create({
           number: num,
           name: name,
           email: studentForm.email.trim(),
           courses: [activeCourse.id]
+        });
+
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.STUDENT,
+          details: `"${name}" (${num}) isimli yeni öğrenci oluşturuldu ve "${activeCourse?.code} - ${activeCourse?.name}" dersine eklendi.`,
+          metadata: { studentId: newSt.id, number: num, course: activeCourse?.name }
         });
       }
 
@@ -283,6 +310,12 @@ export default function Grades() {
         }
 
         setStudents(prev => prev.filter(s => s.id !== studentId));
+        logAction({
+          action: LOG_ACTIONS.DELETE,
+          category: LOG_CATEGORIES.STUDENT,
+          details: `"${studentName}" isimli öğrenci "${activeCourse?.code} - ${activeCourse?.name}" dersinden çıkarıldı ve notları silindi.`,
+          metadata: { studentId, studentName, course: activeCourse?.name }
+        });
         alert('Öğrenci bu dersten başarıyla çıkarıldı.', 'Başarılı', 'success');
       } catch (err) {
         console.error('Error removing student from course:', err);
@@ -540,11 +573,21 @@ export default function Grades() {
       await loadStudentsForCourse(activeCourse.id);
       setGrades(updatedGrades);
       setDirtyGrades(newDirty);
-      if (errorCount > 0) {
-        alert(`${errorCount} öğrenci işlenemedi. ${updatedCount} not yükleme önbelleğine alındı. Kaydetmek için 'Notları Kaydet' butonuna basınız.`, 'Aktarım Tamamlandı', 'warning');
-      } else {
-        alert(`${updatedCount} not başarıyla yüklendi. Kaydetmek için 'Notları Kaydet' butonuna basınız.`, 'Başarılı', 'success');
-      }
+      await loadStudentsForCourse(activeCourse.id);
+
+      const selectedExamObj = exams.find(e => e.id === selectedExam);
+      logAction({
+        action: LOG_ACTIONS.IMPORT,
+        category: LOG_CATEGORIES.GRADE,
+        details: `Excel ile "${activeCourse?.code} - ${activeCourse?.name}" dersinin "${selectedExamObj?.type || 'Sınav'}" sınavına ${updatedCount} adet not ve öğrenci verisi içe aktarıldı.`,
+        metadata: { course: activeCourse?.name, exam: selectedExamObj?.type, importedCount: updatedCount }
+      });
+
+      alert(
+        `${importedStudentsCount} öğrenci işlendi, ${updatedCount} soru notu aktarıldı. Değişiklikleri kalıcı yapmak için lütfen "Notları Kaydet" butonuna basınız.`,
+        'Excel Yüklendi',
+        'success'
+      );
     } catch (err) {
       console.error('Error importing grades:', err);
       alert('Dosya okunurken bir hata oluştu: ' + err.message, 'Hata', 'error');

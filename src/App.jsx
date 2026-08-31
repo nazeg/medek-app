@@ -8,6 +8,7 @@ import Departments from './pages/admin/Departments';
 import Users from './pages/admin/Users';
 import AdminReports from './pages/admin/Reports';
 import Terms from './pages/admin/Terms';
+import AdminLogs from './pages/admin/Logs';
 import CoordinatorDashboard from './pages/coordinator/Dashboard';
 import Programs from './pages/coordinator/Programs';
 import CoordinatorCourses from './pages/coordinator/Courses';
@@ -56,6 +57,7 @@ function AppRoutes() {
         <Route path="users" element={<Users />} />
         <Route path="terms" element={<Terms />} />
         <Route path="reports" element={<AdminReports />} />
+        <Route path="logs" element={<AdminLogs />} />
       </Route>
       <Route path="/coordinator" element={<ProtectedRoute roles={['coordinator', 'program_head']}><Layout /></ProtectedRoute>}>
         <Route index element={<CoordinatorDashboard />} />

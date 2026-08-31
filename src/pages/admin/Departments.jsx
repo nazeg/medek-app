@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import pb from '../../lib/pocketbase';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Departments() {
   const { alert, confirm } = useAlertConfirm();
@@ -69,10 +70,25 @@ export default function Departments() {
         head: form.head || ''
       };
       
+      const targetFaculty = faculties.find(f => f.id === form.faculty);
+      const headUser = users.find(u => u.id === form.head);
+
       if (editItem) {
         await pb.collection('programs').update(editItem.id, data);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.FACULTY_DEPT,
+          details: `"${form.name}" programı güncellendi. Fakülte: ${targetFaculty?.name || '—'}, Bölüm Başkanı: ${headUser?.name || 'Atanmadı'}`,
+          metadata: { programId: editItem.id, name: form.name, faculty: targetFaculty?.name, head: headUser?.name }
+        });
       } else {
-        await pb.collection('programs').create(data);
+        const res = await pb.collection('programs').create(data);
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.FACULTY_DEPT,
+          details: `"${form.name}" adlı yeni program ekalendi. Fakülte: ${targetFaculty?.name || '—'}, Bölüm Başkanı: ${headUser?.name || 'Atanmadı'}`,
+          metadata: { programId: res.id, name: form.name, faculty: targetFaculty?.name, head: headUser?.name }
+        });
       }
       
       setShowModal(false);
@@ -85,9 +101,16 @@ export default function Departments() {
   };
 
   const handleDelete = async (id) => {
+    const target = programs.find(p => p.id === id);
     if (await confirm('Bölüm/Programı silmek istediğinize emin misiniz?')) {
       try {
         await pb.collection('programs').delete(id);
+        logAction({
+          action: LOG_ACTIONS.DELETE,
+          category: LOG_CATEGORIES.FACULTY_DEPT,
+          details: `"${target?.name || id}" programı silindi.`,
+          metadata: { programId: id, name: target?.name }
+        });
         load();
       } catch (err) {
         await alert('Silme işlemi başarısız. Lütfen önce ilişkili dersleri, çıktıları ve notları temizleyin.', 'Hata', 'error');

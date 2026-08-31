@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTerm } from '../../contexts/TermContext';
 import { useProgram } from '../../contexts/ProgramContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function CoordinatorCourses() {
   const { user: coordinatorUser } = useAuth();
@@ -206,8 +207,20 @@ export default function CoordinatorCourses() {
 
       if (editItem) {
         await pb.collection('courses').update(editItem.id, saveData);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.COURSE,
+          details: `"${form.code} - ${form.name}" ${form.sube ? `(Şube: ${form.sube})` : ''} dersi güncellendi. Program: ${activeProgram?.name || '—'}, Dönem: ${activeTerm?.name || '—'}`,
+          metadata: { courseId: editItem.id, code: form.code, name: form.name, sube: form.sube, akts: form.akts }
+        });
       } else {
-        await pb.collection('courses').create(saveData);
+        const res = await pb.collection('courses').create(saveData);
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.COURSE,
+          details: `"${form.code} - ${form.name}" ${form.sube ? `(Şube: ${form.sube})` : ''} adlı yeni ders eklendi. Program: ${activeProgram?.name || '—'}, Dönem: ${activeTerm?.name || '—'}`,
+          metadata: { courseId: res.id, code: form.code, name: form.name, sube: form.sube, akts: form.akts }
+        });
       }
       setShowModal(false);
       setEditItem(null);
@@ -253,8 +266,15 @@ export default function CoordinatorCourses() {
   };
 
   const handleDelete = async (id) => {
+    const target = courses.find(c => c.id === id);
     if (await confirm('Silmek istediğinize emin misiniz?')) {
       await pb.collection('courses').delete(id);
+      logAction({
+        action: LOG_ACTIONS.DELETE,
+        category: LOG_CATEGORIES.COURSE,
+        details: `"${target?.code || ''} - ${target?.name || id}" dersi silindi.`,
+        metadata: { courseId: id, code: target?.code, name: target?.name }
+      });
       load();
     }
   };
@@ -548,6 +568,14 @@ export default function CoordinatorCourses() {
         }
       }
       setImportResult({ created, errors, skipped });
+      if (created > 0) {
+        logAction({
+          action: LOG_ACTIONS.IMPORT,
+          category: LOG_CATEGORIES.COURSE,
+          details: `Excel ile "${activeProgram?.name || 'Program'}" programına ${created} yeni ders toplu olarak içe aktarıldı. (${skipped} atlandı, ${errors} hata)`,
+          metadata: { created, skipped, errors, program: activeProgram?.name, term: activeTerm?.name }
+        });
+      }
       load();
     } catch (err) {
       console.error("Excel import failed:", err);

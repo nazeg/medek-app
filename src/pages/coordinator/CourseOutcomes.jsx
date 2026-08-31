@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useProgram } from '../../contexts/ProgramContext';
 import { useActiveCourse } from '../../contexts/CourseContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function CoordinatorCourseOutcomes() {
   const location = useLocation();
@@ -61,7 +62,7 @@ export default function CoordinatorCourseOutcomes() {
             expand: 'course' 
           }),
           pb.collection('courses').getFullList({ 
-            sort: 'code',
+            sort: 'code', 
             filter: `program = "${activeProgram.id}"`
           }),
           pb.collection('program_outcomes').getFullList({
@@ -85,11 +86,24 @@ export default function CoordinatorCourseOutcomes() {
 
   const handleSave = async () => {
     const courseId = isInstructorView ? activeCourse.id : form.course;
+    const targetCourse = courses.find(c => c.id === courseId) || activeCourse;
     const data = { ...form, course: courseId };
     if (editItem) {
       await pb.collection('course_outcomes').update(editItem.id, data);
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.OUTCOMES,
+        details: `"${form.code}" ders çıktısı güncellendi. Ders: ${targetCourse ? targetCourse.code + ' - ' + targetCourse.name : '—'}`,
+        metadata: { outcomeId: editItem.id, code: form.code, courseId }
+      });
     } else {
-      await pb.collection('course_outcomes').create(data);
+      const res = await pb.collection('course_outcomes').create(data);
+      logAction({
+        action: LOG_ACTIONS.CREATE,
+        category: LOG_CATEGORIES.OUTCOMES,
+        details: `"${form.code}" adlı yeni ders çıktısı eklendi. Ders: ${targetCourse ? targetCourse.code + ' - ' + targetCourse.name : '—'}`,
+        metadata: { outcomeId: res.id, code: form.code, courseId }
+      });
     }
     setShowModal(false);
     setEditItem(null);
@@ -104,11 +118,18 @@ export default function CoordinatorCourseOutcomes() {
   };
 
   const handleDelete = async (id) => {
+    const target = outcomes.find(o => o.id === id);
     if (await confirm('Silmek istediğinize emin misiniz?')) {
       await pb.collection('course_outcomes').delete(id);
+      logAction({
+        action: LOG_ACTIONS.DELETE,
+        category: LOG_CATEGORIES.OUTCOMES,
+        details: `"${target?.code || id}" ders çıktısı silindi. Ders: ${target?.expand?.course?.name || '—'}`,
+        metadata: { outcomeId: id, code: target?.code }
+      });
       load();
     }
-  };
+  };;
 
   return (
     <>

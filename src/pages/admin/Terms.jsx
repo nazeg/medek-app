@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import pb from '../../lib/pocketbase';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
 import { useTerm } from '../../contexts/TermContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Terms() {
   const { alert, confirm } = useAlertConfirm();
@@ -30,8 +31,20 @@ export default function Terms() {
       const data = { name };
       if (editItem) {
         await pb.collection('terms').update(editItem.id, data);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.TERM,
+          details: `"${name}" dönemi güncellendi.`,
+          metadata: { termId: editItem.id, name }
+        });
       } else {
-        await pb.collection('terms').create(data);
+        const res = await pb.collection('terms').create(data);
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.TERM,
+          details: `"${name}" adlı yeni dönem eklendi.`,
+          metadata: { termId: res.id, name }
+        });
       }
       
       if (refreshTerms) refreshTerms();
@@ -52,12 +65,23 @@ export default function Terms() {
   };
 
   const handleDelete = async (id) => {
+    const target = termsList.find(t => t.id === id);
     if (await confirm('Dönemi silmek istediğinize emin misiniz? Bu işlem bağlı dersleri etkileyebilir.')) {
       try {
         await pb.collection('terms').delete(id);
+        logAction({
+          action: LOG_ACTIONS.DELETE,
+          category: LOG_CATEGORIES.TERM,
+          details: `"${target?.name || id}" dönemi silindi.`,
+          metadata: { termId: id, name: target?.name }
+        });
         if (refreshTerms) refreshTerms();
         load();
       } catch (err) {
+        await alert('Dönem silinemedi. Lütfen önce bu döneme bağlı dersleri silin veya güncelleyin.', 'Hata', 'error');
+      }
+    }
+  };
         await alert('Dönem silinemedi. Lütfen önce bu döneme bağlı dersleri silin veya güncelleyin.', 'Hata', 'error');
       }
     }

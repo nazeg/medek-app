@@ -5,6 +5,7 @@ import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
 import { useActiveCourse } from '../../contexts/CourseContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Exams() {
   const { confirm, alert } = useAlertConfirm();
@@ -236,8 +237,20 @@ export default function Exams() {
     try {
       if (questionForm.id) {
         await pb.collection('questions').update(questionForm.id, data);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.EXAM,
+          details: `"${activeCourse?.code} - ${activeCourse?.name}" dersinin "${questionForm.exam}" sınavı için "${questionForm.code || 'Soru ' + questionForm.number}" sorusu güncellendi. (${questionForm.max_score} Puan)`,
+          metadata: { questionId: questionForm.id, exam: questionForm.exam, maxScore: questionForm.max_score, course: activeCourse?.name }
+        });
       } else {
-        await pb.collection('questions').create(data);
+        const res = await pb.collection('questions').create(data);
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.EXAM,
+          details: `"${activeCourse?.code} - ${activeCourse?.name}" dersinin "${questionForm.exam}" sınavına "${questionForm.code || 'Soru ' + questionForm.number}" sorusu eklendi. (${questionForm.max_score} Puan)`,
+          metadata: { questionId: res.id, exam: questionForm.exam, maxScore: questionForm.max_score, course: activeCourse?.name }
+        });
       }
       
       const questionList = await pb.collection('questions').getFullList({
@@ -255,9 +268,16 @@ export default function Exams() {
   };
 
   const handleDeleteQuestion = async (id) => {
+    const target = questions.find(q => q.id === id);
     if (await confirm('Bu soruyu silmek istediğinize emin misiniz?')) {
       try {
         await pb.collection('questions').delete(id);
+        logAction({
+          action: LOG_ACTIONS.DELETE,
+          category: LOG_CATEGORIES.EXAM,
+          details: `"${activeCourse?.code} - ${activeCourse?.name}" dersinin "${target?.expand?.exam?.type || 'Sınav'}" sınavından "${target?.code || 'Soru ' + target?.number}" sorusu silindi.`,
+          metadata: { questionId: id, course: activeCourse?.name }
+        });
         const questionList = await pb.collection('questions').getFullList({
           filter: `exam.course = "${activeCourse.id}"`,
           sort: 'number',
@@ -534,6 +554,15 @@ export default function Exams() {
       });
       setQuestions(questionList);
       resetQuestionForm(questionForm.exam || 'Vize', questionList);
+
+      if (created > 0) {
+        logAction({
+          action: LOG_ACTIONS.IMPORT,
+          category: LOG_CATEGORIES.EXAM,
+          details: `Excel ile "${activeCourse?.code} - ${activeCourse?.name}" dersine ${created} soru toplu olarak yüklendi.`,
+          metadata: { created, errors, course: activeCourse?.name }
+        });
+      }
 
       if (errors > 0) {
         await alert(`${errors} satırda hata oluştu. ${created} soru aktarıldı.`, 'Aktarımda Hatalar Var', 'warning');

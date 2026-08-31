@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import pb from '../../lib/pocketbase';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Users() {
   const { alert, confirm } = useAlertConfirm();
@@ -30,12 +31,24 @@ export default function Users() {
       if (editItem) {
         const updateData = { name: form.name, role: form.role, faculty: form.faculty, title: form.title };
         savedUser = await pb.collection('users').update(editItem.id, updateData);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.USER,
+          details: `"${form.title ? form.title + ' ' : ''}${form.name}" (${savedUser.email || form.email}) kullanıcısının bilgileri güncellendi. Rol: ${roleLabels[form.role] || form.role}`,
+          metadata: { userId: savedUser.id, role: form.role, programIds: form.programIds }
+        });
       } else {
         savedUser = await pb.collection('users').create({
           name: form.name, email: form.email, password: form.password,
           passwordConfirm: form.passwordConfirm, role: form.role, faculty: form.faculty, title: form.title,
           emailVisibility: true,
           active: true,
+        });
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.USER,
+          details: `"${form.title ? form.title + ' ' : ''}${form.name}" (${form.email}) adlı yeni kullanıcı oluşturuldu. Rol: ${roleLabels[form.role] || form.role}`,
+          metadata: { userId: savedUser.id, role: form.role, email: form.email, programIds: form.programIds }
         });
       }
 
@@ -85,8 +98,15 @@ export default function Users() {
   };
 
   const handleDelete = async (id) => {
+    const targetUser = users.find(u => u.id === id);
     if (await confirm('Silmek istediğinize emin misiniz?')) {
       await pb.collection('users').delete(id);
+      logAction({
+        action: LOG_ACTIONS.DELETE,
+        category: LOG_CATEGORIES.USER,
+        details: `"${targetUser?.name || id}" (${targetUser?.email || ''}) kullanıcısı sistemden silindi.`,
+        metadata: { userId: id, name: targetUser?.name, email: targetUser?.email }
+      });
       load();
     }
   };
@@ -95,6 +115,12 @@ export default function Users() {
     const nextState = user.active === false ? true : false;
     try {
       await pb.collection('users').update(user.id, { active: nextState });
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.USER,
+        details: `"${user.name}" (${user.email}) kullanıcısının hesap durumu ${nextState ? 'Aktif' : 'Pasif'} yapıldı.`,
+        metadata: { userId: user.id, active: nextState }
+      });
       load();
     } catch (err) {
       await alert('Durum güncellenirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');

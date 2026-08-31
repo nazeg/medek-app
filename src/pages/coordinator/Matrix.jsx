@@ -4,6 +4,7 @@ import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTerm } from '../../contexts/TermContext';
 import { useProgram } from '../../contexts/ProgramContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Matrix() {
   const location = useLocation();
@@ -63,6 +64,9 @@ export default function Matrix() {
     const progId = activeProgram?.id;
     if (!progId) return;
     const key = `${pc}_${dc}`;
+    const targetPc = pcList.find(p => p.id === pc);
+    const targetDc = dcList.find(d => d.id === dc);
+
     try {
       const existing = await pb.collection('pc_dc_matrix').getFirstListItem(`program = "${progId}" && pc = "${pc}" && dc = "${dc}"`);
       if (level === 0) {
@@ -76,6 +80,13 @@ export default function Matrix() {
       }
     }
     setMatrix(prev => ({ ...prev, [key]: parseInt(level) }));
+
+    logAction({
+      action: LOG_ACTIONS.UPDATE,
+      category: LOG_CATEGORIES.MATRIX,
+      details: `${targetDc?.expand?.course?.code ? `[${targetDc.expand.course.code}] ` : ''}${targetDc?.code || 'DÇ'} ↔ ${targetPc?.code || 'PÇ'} matris ilişki düzeyi "${level}" olarak güncellendi.`,
+      metadata: { programId: progId, pc: targetPc?.code, dc: targetDc?.code, level }
+    });
   };
 
   const levelColor = (l) => {

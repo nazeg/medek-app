@@ -10,6 +10,7 @@ const adminNav = [
   { to: '/admin/users', icon: 'manage_accounts', label: 'Kullanıcılar' },
   { to: '/admin/terms', icon: 'calendar_month', label: 'Dönem Yönetimi' },
   { to: '/admin/reports', icon: 'analytics', label: 'Raporlar' },
+  { to: '/admin/logs', icon: 'history', label: 'İşlem Geçmişi' },
 ];
 
 const coordinatorNav = [

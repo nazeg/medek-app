@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import pb from '../../lib/pocketbase';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function Faculties() {
   const { alert, confirm } = useAlertConfirm();
@@ -49,8 +50,20 @@ export default function Faculties() {
     const data = { name, type, sort_order: faculties.length };
     if (editItem) {
       await pb.collection('faculties').update(editItem.id, data);
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.FACULTY_DEPT,
+        details: `"${name}" (${type === 'myo' ? 'MYO' : 'Fakülte'}) birimi güncellendi.`,
+        metadata: { facultyId: editItem.id, name, type }
+      });
     } else {
-      await pb.collection('faculties').create(data);
+      const res = await pb.collection('faculties').create(data);
+      logAction({
+        action: LOG_ACTIONS.CREATE,
+        category: LOG_CATEGORIES.FACULTY_DEPT,
+        details: `"${name}" (${type === 'myo' ? 'MYO' : 'Fakülte'}) adlı yeni birim eklendi.`,
+        metadata: { facultyId: res.id, name, type }
+      });
     }
     setShowModal(false);
     setEditItem(null);
@@ -67,9 +80,16 @@ export default function Faculties() {
   };
 
   const handleDelete = async (id) => {
+    const target = faculties.find(f => f.id === id);
     if (await confirm('Silmek istediğinize emin misiniz?')) {
       try {
         await pb.collection('faculties').delete(id);
+        logAction({
+          action: LOG_ACTIONS.DELETE,
+          category: LOG_CATEGORIES.FACULTY_DEPT,
+          details: `"${target?.name || id}" birimi silindi.`,
+          metadata: { facultyId: id, name: target?.name }
+        });
         load();
       } catch (err) {
         await alert('Bu birim silinemez. Lütfen önce bağlı kullanıcıları ve bölümleri silin veya güncelleyin.', 'Hata', 'error');

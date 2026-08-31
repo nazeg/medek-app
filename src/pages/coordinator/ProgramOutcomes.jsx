@@ -3,6 +3,7 @@ import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProgram } from '../../contexts/ProgramContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function ProgramOutcomes() {
   const { user: coordinatorUser } = useAuth();
@@ -35,8 +36,20 @@ export default function ProgramOutcomes() {
     const data = { ...form, program: activeProgram.id };
     if (editItem) {
       await pb.collection('program_outcomes').update(editItem.id, data);
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.OUTCOMES,
+        details: `"${form.code}" program çıktısı güncellendi. Program: ${activeProgram?.name || '—'}`,
+        metadata: { outcomeId: editItem.id, code: form.code, description: form.description }
+      });
     } else {
-      await pb.collection('program_outcomes').create(data);
+      const res = await pb.collection('program_outcomes').create(data);
+      logAction({
+        action: LOG_ACTIONS.CREATE,
+        category: LOG_CATEGORIES.OUTCOMES,
+        details: `"${form.code}" adlı yeni program çıktısı eklendi. Program: ${activeProgram?.name || '—'}`,
+        metadata: { outcomeId: res.id, code: form.code, description: form.description }
+      });
     }
     setShowModal(false);
     setEditItem(null);
@@ -51,8 +64,15 @@ export default function ProgramOutcomes() {
   };
 
   const handleDelete = async (id) => {
+    const target = outcomes.find(o => o.id === id);
     if (await confirm('Silmek istediğinize emin misiniz?')) {
       await pb.collection('program_outcomes').delete(id);
+      logAction({
+        action: LOG_ACTIONS.DELETE,
+        category: LOG_CATEGORIES.OUTCOMES,
+        details: `"${target?.code || id}" program çıktısı silindi. Program: ${activeProgram?.name || '—'}`,
+        metadata: { outcomeId: id, code: target?.code }
+      });
       load();
     }
   };
