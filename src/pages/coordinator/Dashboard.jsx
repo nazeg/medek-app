@@ -35,69 +35,79 @@ export default function CoordinatorDashboard() {
           ? `faculty = "${user.faculty}"`
           : `head = "${user.id}"`;
 
-        // If specific program is selected in top navbar
         const targetProgId = activeProgram?.id;
-        
-        const courseFilter = targetProgId 
-          ? (activeTerm?.id ? `program = "${targetProgId}" && term = "${activeTerm.id}"` : `program = "${targetProgId}"`)
-          : (isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`);
 
-        const poFilter = targetProgId
-          ? `program = "${targetProgId}"`
-          : (isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`);
+        // Fetch programs list for this user
+        const progsRes = await pb.collection('programs').getFullList({
+          sort: 'name',
+          filter: progFilter,
+        }).catch(() => []);
 
-        const coFilter = targetProgId
-          ? `course.program = "${targetProgId}"`
-          : (isCoordinator ? `course.program.faculty = "${user.faculty}"` : `course.program.head = "${user.id}"`);
+        // Course filter based on targetProgId and activeTerm
+        let courseFilter = '';
+        if (targetProgId) {
+          courseFilter = activeTerm?.id 
+            ? `program = "${targetProgId}" && term = "${activeTerm.id}"`
+            : `program = "${targetProgId}"`;
+        } else {
+          const baseProg = isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`;
+          courseFilter = activeTerm?.id ? `${baseProg} && term = "${activeTerm.id}"` : baseProg;
+        }
 
-        const matrixFilter = targetProgId
-          ? `program = "${targetProgId}"`
-          : (isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`);
+        // Program Outcomes (PÇ) filter
+        let poFilter = '';
+        if (targetProgId) {
+          poFilter = `program = "${targetProgId}"`;
+        } else if (progsRes.length > 0) {
+          poFilter = progsRes.map(p => `program = "${p.id}"`).join(' || ');
+        }
 
-        const [progsRes, coursesRes, poRes, coRes, matrixRes, instructorsRes] = await Promise.all([
-          pb.collection('programs').getFullList({ sort: 'name', filter: progFilter }),
+        const [coursesRes, poRes] = await Promise.all([
           pb.collection('courses').getFullList({
             sort: 'name',
             filter: courseFilter,
             expand: 'instructor,program',
-          }),
-          pb.collection('program_outcomes').getList(1, 1, {
-            filter: poFilter,
-          }),
-          pb.collection('course_outcomes').getList(1, 1, {
-            filter: coFilter,
-          }),
-          pb.collection('pc_dc_matrix').getList(1, 1, {
-            filter: matrixFilter,
-          }),
-          pb.collection('users').getList(1, 1, {
-            filter: isCoordinator
-              ? `faculty = "${user.faculty}" && role = "instructor"`
-              : `faculty = "${user.faculty}" && (role = "instructor" || role = "program_head")`,
-          }),
+          }).catch(() => []),
+          poFilter ? pb.collection('program_outcomes').getList(1, 1, { filter: poFilter }).catch(() => ({ totalItems: 0 })) : Promise.resolve({ totalItems: 0 }),
         ]);
 
-        // If activeProgram is selected, calculate instructors assigned to this program's courses
-        let instructorCount = instructorsRes.totalItems;
-        if (targetProgId) {
-          const programInstructors = new Set();
-          coursesRes.forEach(c => {
-            if (Array.isArray(c.instructor)) {
-              c.instructor.forEach(i => programInstructors.add(i));
-            } else if (c.instructor) {
-              programInstructors.add(c.instructor);
-            }
-          });
-          instructorCount = programInstructors.size;
+        let courseOutcomesCount = 0;
+        let matrixRowsCount = 0;
+
+        if (coursesRes.length > 0) {
+          const courseIdsFilter = coursesRes.map(c => `course = "${c.id}"`).join(' || ');
+          const dcsList = await pb.collection('course_outcomes').getFullList({
+            filter: courseIdsFilter,
+          }).catch(() => []);
+          
+          courseOutcomesCount = dcsList.length;
+
+          if (dcsList.length > 0) {
+            const dcIdsFilter = dcsList.map(d => `dc = "${d.id}"`).join(' || ');
+            const matrixRes = await pb.collection('pc_dc_matrix').getList(1, 1, {
+              filter: dcIdsFilter,
+            }).catch(() => ({ totalItems: 0 }));
+            matrixRowsCount = matrixRes.totalItems;
+          }
         }
+
+        // Calculate distinct instructors assigned to the active courses for this selection
+        const distinctInstructors = new Set();
+        coursesRes.forEach(c => {
+          if (Array.isArray(c.instructor)) {
+            c.instructor.forEach(i => i && distinctInstructors.add(i));
+          } else if (c.instructor) {
+            distinctInstructors.add(c.instructor);
+          }
+        });
 
         setStats({
           programs: targetProgId ? 1 : progsRes.length,
           courses: coursesRes.length,
-          outcomes: poRes.totalItems,
-          courseOutcomes: coRes.totalItems,
-          matrixRows: matrixRes.totalItems,
-          instructors: instructorCount,
+          outcomes: poRes.totalItems || 0,
+          courseOutcomes: courseOutcomesCount,
+          matrixRows: matrixRowsCount,
+          instructors: distinctInstructors.size,
         });
         setCourses(coursesRes.slice(0, 8));
       } catch (err) {
@@ -298,10 +308,17 @@ export default function CoordinatorDashboard() {
                     {courses.map((course) => (
                       <tr key={course.id} className="hover:bg-surface-container-low/50 transition-colors">
                         <td className="px-6 py-3.5">
-                          <span className="font-semibold text-on-surface text-sm">{course.name}</span>
-                          {course.code && (
-                            <span className="ml-2 text-xs text-on-surface-variant">{course.code}</span>
-                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-on-surface text-sm">{course.name}</span>
+                            {course.sube && (
+                              <span className="px-2 py-0.5 rounded-md text-[11px] bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                                Şube {course.sube}
+                              </span>
+                            )}
+                            {course.code && (
+                              <span className="text-xs text-on-surface-variant font-mono">({course.code})</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-3.5 text-xs text-on-surface-variant">
                           {course.expand?.program?.name || '—'}
