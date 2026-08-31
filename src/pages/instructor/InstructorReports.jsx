@@ -99,11 +99,7 @@ export default function InstructorReports() {
           assignedList = assignedList.filter(c => c.program === activeProgram.id || c.expand?.program?.id === activeProgram.id);
         }
         setCoursesList(assignedList);
-        if (assignedList.length > 0) {
-          setSelectedCourse(assignedList[0]);
-        } else {
-          setSelectedCourse(null);
-        }
+        setSelectedCourse(null);
       }).catch(err => {
         console.error('Error loading courses for reports:', err);
       });
@@ -118,11 +114,7 @@ export default function InstructorReports() {
         expand: 'program'
       }).then(list => {
         setCoursesList(list);
-        if (list.length > 0) {
-          setSelectedCourse(list[0]);
-        } else {
-          setSelectedCourse(null);
-        }
+        setSelectedCourse(null);
       }).catch(err => {
         console.error('Error loading courses for reports:', err);
       });
@@ -227,11 +219,7 @@ export default function InstructorReports() {
       });
 
       setCourseExamsList(list);
-
-      // Default selection: select all exams except Bütünleme (if other exams exist)
-      const nonButExams = list.filter(e => e.type !== 'Bütünleme');
-      const defaultTypes = nonButExams.length > 0 ? nonButExams.map(e => e.type) : list.map(e => e.type);
-      setSelectedExamTypes(defaultTypes);
+      setSelectedExamTypes([]);
     }).catch(err => {
       console.error('Error loading course exams:', err);
       setCourseExamsList([]);
