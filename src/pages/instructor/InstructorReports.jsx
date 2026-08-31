@@ -87,7 +87,7 @@ export default function InstructorReports() {
       pb.collection('courses').getFullList({
         filter,
         sort: 'code',
-        expand: 'program,instructor'
+        expand: 'program,program.faculty,instructor'
       }).then(list => {
         let assignedList = list.filter(course => {
           if (!course.instructor) return false;
@@ -112,7 +112,7 @@ export default function InstructorReports() {
       pb.collection('courses').getFullList({
         filter,
         sort: 'code',
-        expand: 'program'
+        expand: 'program,program.faculty,instructor'
       }).then(list => {
         setCoursesList(list);
         setSelectedCourse(null);
@@ -866,120 +866,173 @@ export default function InstructorReports() {
         termSummaryMap[term.id] = {};
         pcs.forEach(pc => { termSummaryMap[term.id][pc.code] = { wSum: 0, wAkts: 0 }; });
 
+        // Group courses by code (or name) and sinif to treat sections (şubeler) of the same course as a single unit
+        const courseGroups = {};
         for (const course of courses) {
-          const [dcs, matrix, questions, rawStudents, grades] = await Promise.all([
-            pb.collection('course_outcomes').getFullList({ filter: `course = "${course.id}"` }),
-            pb.collection('pc_dc_matrix').getFullList({ filter: `program = "${selectedProgram.id}"` }),
-            pb.collection('questions').getFullList({ filter: `exam.course = "${course.id}"`, expand: 'exam,course_outcome' }),
-            pb.collection('students').getFullList(),
-            pb.collection('student_grades').getFullList({ filter: `exam.course = "${course.id}"` })
-          ]);
-
-          const students = rawStudents.filter(s => {
-            if (Array.isArray(s.courses) && s.courses.includes(course.id)) return true;
-            if (grades.some(g => g.student === s.id)) return true;
-            return false;
-          });
-
-          if (dcs.length === 0 || questions.length === 0 || students.length === 0) continue;
-
-          const allTypes = [...new Set(questions.map(q => q.expand?.exam?.type))];
-          const hasFinal = allTypes.includes('Final');
-          const useExams = allTypes.filter(et => et && !(et === 'Bütünleme' && hasFinal));
-
-          const pctMap = {
-            'Vize': course.pct_vize ?? 40,
-            'Ödev': course.pct_odev ?? 0,
-            'Proje': course.pct_proje ?? 0,
-            'Sunum': course.pct_sunum ?? 0,
-            'Uygulama': course.pct_uygulama ?? 0,
-            'Final': course.pct_final ?? 60,
-            'Bütünleme': course.pct_but ?? 60
-          };
-          if (Array.isArray(course.custom_weights)) {
-            course.custom_weights.forEach(cw => {
-              if (cw.name) pctMap[cw.name] = cw.percentage ?? 0;
-            });
+          const codeKey = (course.code || course.name || course.id).trim().toUpperCase();
+          const sinifKey = String(course.sinif || '1');
+          const groupKey = `${codeKey}_${sinifKey}`;
+          if (!courseGroups[groupKey]) {
+            courseGroups[groupKey] = [];
           }
-          const isMulti = useExams.length > 1;
+          courseGroups[groupKey].push(course);
+        }
 
-          const dcExamSonuc = {};
-          dcs.forEach(d => {
-            dcExamSonuc[d.code] = {};
-            useExams.forEach(et => { dcExamSonuc[d.code][et] = { alinan: 0, max: 0 }; });
-          });
+        for (const groupKey of Object.keys(courseGroups)) {
+          const groupCourses = courseGroups[groupKey];
+          const sectionResults = [];
 
-          students.forEach(o => {
-            questions.forEach(q => {
-              const examType = q.expand?.exam?.type;
-              if (!useExams.includes(examType)) return;
+          for (const course of groupCourses) {
+            const [dcs, matrix, questions, rawStudents, grades] = await Promise.all([
+              pb.collection('course_outcomes').getFullList({ filter: `course = "${course.id}"` }),
+              pb.collection('pc_dc_matrix').getFullList({ filter: `program = "${selectedProgram.id}"` }),
+              pb.collection('questions').getFullList({ filter: `exam.course = "${course.id}"`, expand: 'exam,course_outcome' }),
+              pb.collection('students').getFullList(),
+              pb.collection('student_grades').getFullList({ filter: `exam.course = "${course.id}"` })
+            ]);
 
-              const qDcCodes = getQuestionDcCodes(q);
-              if (qDcCodes.length === 0) return;
+            const students = rawStudents.filter(s => {
+              if (Array.isArray(s.courses) && s.courses.includes(course.id)) return true;
+              if (grades.some(g => g.student === s.id)) return true;
+              return false;
+            });
 
-              const grade = grades.find(g => g.student === o.id && g.question === q.id);
-              const score = getQuestionScore(q, grade);
+            if (dcs.length === 0 || questions.length === 0 || students.length === 0) continue;
 
-              qDcCodes.forEach(code => {
-                if (dcExamSonuc[code] && dcExamSonuc[code][examType]) {
-                  dcExamSonuc[code][examType].alinan += Number(score);
-                  dcExamSonuc[code][examType].max += Number(q.max_score);
-                }
+            const allTypes = [...new Set(questions.map(q => q.expand?.exam?.type))];
+            const hasFinal = allTypes.includes('Final');
+            const useExams = allTypes.filter(et => et && !(et === 'Bütünleme' && hasFinal));
+
+            const pctMap = {
+              'Vize': course.pct_vize ?? 40,
+              'Ödev': course.pct_odev ?? 0,
+              'Proje': course.pct_proje ?? 0,
+              'Sunum': course.pct_sunum ?? 0,
+              'Uygulama': course.pct_uygulama ?? 0,
+              'Final': course.pct_final ?? 60,
+              'Bütünleme': course.pct_but ?? 60
+            };
+            if (Array.isArray(course.custom_weights)) {
+              course.custom_weights.forEach(cw => {
+                if (cw.name) pctMap[cw.name] = cw.percentage ?? 0;
+              });
+            }
+            const isMulti = useExams.length > 1;
+
+            const dcExamSonuc = {};
+            dcs.forEach(d => {
+              dcExamSonuc[d.code] = {};
+              useExams.forEach(et => { dcExamSonuc[d.code][et] = { alinan: 0, max: 0 }; });
+            });
+
+            students.forEach(o => {
+              questions.forEach(q => {
+                const examType = q.expand?.exam?.type;
+                if (!useExams.includes(examType)) return;
+
+                const qDcCodes = getQuestionDcCodes(q);
+                if (qDcCodes.length === 0) return;
+
+                const grade = grades.find(g => g.student === o.id && g.question === q.id);
+                const score = getQuestionScore(q, grade);
+
+                qDcCodes.forEach(code => {
+                  if (dcExamSonuc[code] && dcExamSonuc[code][examType]) {
+                    dcExamSonuc[code][examType].alinan += Number(score);
+                    dcExamSonuc[code][examType].max += Number(q.max_score);
+                  }
+                });
               });
             });
-          });
 
-          const dcSuccessMap = {};
-          const dcAssessed = {};
-          dcs.forEach(dc => {
-            if (!isMulti) {
-              const et = useExams[0];
-              const { alinan, max } = dcExamSonuc[dc.code]?.[et] || { alinan: 0, max: 0 };
-              dcSuccessMap[dc.code] = max > 0 ? (alinan / max) * 100 : 0;
-              dcAssessed[dc.code] = max > 0;
-            } else {
-              let wSum = 0, wTotal = 0;
-              useExams.forEach(et => {
+            const dcSuccessMap = {};
+            const dcAssessed = {};
+            dcs.forEach(dc => {
+              if (!isMulti) {
+                const et = useExams[0];
                 const { alinan, max } = dcExamSonuc[dc.code]?.[et] || { alinan: 0, max: 0 };
-                if (max > 0) {
-                  wSum += (alinan / max) * 100 * (pctMap[et] || 0);
-                  wTotal += (pctMap[et] || 0);
+                dcSuccessMap[dc.code] = max > 0 ? (alinan / max) * 100 : 0;
+                dcAssessed[dc.code] = max > 0;
+              } else {
+                let wSum = 0, wTotal = 0;
+                useExams.forEach(et => {
+                  const { alinan, max } = dcExamSonuc[dc.code]?.[et] || { alinan: 0, max: 0 };
+                  if (max > 0) {
+                    wSum += (alinan / max) * 100 * (pctMap[et] || 0);
+                    wTotal += (pctMap[et] || 0);
+                  }
+                });
+                dcSuccessMap[dc.code] = wTotal > 0 ? wSum / wTotal : 0;
+                dcAssessed[dc.code] = wTotal > 0;
+              }
+            });
+
+            const coursePc = {};
+            let courseHasPc = false;
+            pcs.forEach(pc => {
+              let katki = 0, iliski = 0;
+              dcs.forEach(dc => {
+                if (!dcAssessed[dc.code]) return;
+                const rel = matrix.find(m => m.dc === dc.id && m.pc === pc.id)?.level || 0;
+                if (rel > 0) {
+                  katki += (dcSuccessMap[dc.code] || 0) * rel;
+                  iliski += rel;
                 }
               });
-              dcSuccessMap[dc.code] = wTotal > 0 ? wSum / wTotal : 0;
-              dcAssessed[dc.code] = wTotal > 0;
+              coursePc[pc.code] = iliski > 0 ? katki / iliski : null;
+              if (iliski > 0) courseHasPc = true;
+            });
+
+            if (courseHasPc) {
+              sectionResults.push({
+                course,
+                coursePc,
+                studentCount: students.length
+              });
+            }
+          }
+
+          if (sectionResults.length === 0) continue;
+
+          // Combine section results into single course entry
+          const firstCourse = groupCourses[0];
+          const allSubeler = groupCourses.map(c => c.sube).filter(Boolean);
+          const combinedSube = allSubeler.length > 0 ? allSubeler.join(', ') : '';
+
+          const combinedCourse = {
+            ...firstCourse,
+            sube: combinedSube,
+            subeler: allSubeler,
+            sectionCount: groupCourses.length
+          };
+
+          const combinedPc = {};
+          pcs.forEach(pc => {
+            let weightedScoreSum = 0;
+            let totalWeight = 0;
+
+            sectionResults.forEach(sec => {
+              const score = sec.coursePc[pc.code];
+              if (score !== null && score !== undefined) {
+                weightedScoreSum += score * sec.studentCount;
+                totalWeight += sec.studentCount;
+              }
+            });
+
+            combinedPc[pc.code] = totalWeight > 0 ? weightedScoreSum / totalWeight : null;
+          });
+
+          const akts = parseInt(firstCourse.akts) || 1;
+          coursePcRows.push({ course: combinedCourse, term, pcScores: combinedPc, akts });
+
+          pcs.forEach(pc => {
+            if (combinedPc[pc.code] !== null && combinedPc[pc.code] !== undefined) {
+              pcAggregate[pc.code].weightedSum += combinedPc[pc.code] * akts;
+              pcAggregate[pc.code].totalAkts += akts;
+              termSummaryMap[term.id][pc.code].wSum += combinedPc[pc.code] * akts;
+              termSummaryMap[term.id][pc.code].wAkts += akts;
             }
           });
-
-          const coursePc = {};
-          let courseHasPc = false;
-          pcs.forEach(pc => {
-            let katki = 0, iliski = 0;
-            dcs.forEach(dc => {
-              if (!dcAssessed[dc.code]) return;
-              const rel = matrix.find(m => m.dc === dc.id && m.pc === pc.id)?.level || 0;
-              if (rel > 0) {
-                katki += (dcSuccessMap[dc.code] || 0) * rel;
-                iliski += rel;
-              }
-            });
-            coursePc[pc.code] = iliski > 0 ? katki / iliski : null;
-            if (iliski > 0) courseHasPc = true;
-          });
-
-          if (courseHasPc) {
-            const akts = parseInt(course.akts) || 1;
-            coursePcRows.push({ course, term, pcScores: coursePc, akts });
-
-            pcs.forEach(pc => {
-              if (coursePc[pc.code] !== null) {
-                pcAggregate[pc.code].weightedSum += coursePc[pc.code] * akts;
-                pcAggregate[pc.code].totalAkts += akts;
-                termSummaryMap[term.id][pc.code].wSum += coursePc[pc.code] * akts;
-                termSummaryMap[term.id][pc.code].wAkts += akts;
-              }
-            });
-          }
         }
       }
 
@@ -1536,8 +1589,14 @@ export default function InstructorReports() {
                    ======================================================== */}
                 <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-6">
                   {/* PDF & Screen Header */}
-                  <div className="text-center pb-5 border-b-2 border-outline-variant space-y-2">
-                    <h2 className="text-2xl font-black text-[#0058be] tracking-tight">
+                  <div className="text-center pb-5 border-b-2 border-outline-variant space-y-1.5">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kütahya Sağlık Bilimleri Üniversitesi</h3>
+                    {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name || user?.expand?.faculty?.name) && (
+                      <h4 className="text-xs font-semibold text-slate-600">
+                        {selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name || user?.expand?.faculty?.name}
+                      </h4>
+                    )}
+                    <h2 className="text-2xl font-black text-[#0058be] tracking-tight pt-0.5">
                       {selectedCourse.expand?.program?.name || 'Program Belirtilmedi'}
                     </h2>
                     
@@ -1679,6 +1738,7 @@ export default function InstructorReports() {
                   {/* Page Sub Header */}
                   <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
                     <div>
+                      <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name) ? `• ${selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name}` : ''}</div>
                       <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
                       <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
                     </div>
@@ -1798,6 +1858,7 @@ export default function InstructorReports() {
                       {/* Page Sub Header */}
                       <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
                         <div>
+                          <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name) ? `• ${selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name}` : ''}</div>
                           <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
                           <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
                         </div>
@@ -1948,6 +2009,7 @@ export default function InstructorReports() {
                         {/* Page Sub Header */}
                         <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
                           <div>
+                            <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name) ? `• ${selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name}` : ''}</div>
                             <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
                             <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
                           </div>
@@ -2171,6 +2233,7 @@ export default function InstructorReports() {
                   {/* Page Sub Header */}
                   <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
                     <div>
+                      <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name) ? `• ${selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name}` : ''}</div>
                       <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
                       <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
                     </div>
