@@ -23,14 +23,16 @@ export function ProgramProvider({ children }) {
       if (user.role === 'coordinator' || user.role === 'program_head') {
         const headPrograms = await pb.collection('programs').getFullList({ 
           sort: 'name',
-          filter: `head = "${user.id}"`
+          filter: `head = "${user.id}"`,
+          expand: 'faculty'
         });
         if (headPrograms.length > 0) {
           list = headPrograms;
         } else if (user.role === 'coordinator' && user.faculty) {
           list = await pb.collection('programs').getFullList({ 
             sort: 'name',
-            filter: `faculty = "${user.faculty}"`
+            filter: `faculty = "${user.faculty}"`,
+            expand: 'faculty'
           });
         } else {
           list = [];
@@ -38,7 +40,7 @@ export function ProgramProvider({ children }) {
       } else if (user.role === 'instructor') {
         const coursesList = await pb.collection('courses').getFullList({
           filter: `instructor ~ "${user.id}" || instructor ?= "${user.id}"`,
-          expand: 'program',
+          expand: 'program,program.faculty',
           requestKey: null
         });
         const assignedCourses = coursesList.filter(course => {
@@ -56,9 +58,9 @@ export function ProgramProvider({ children }) {
         });
         list = Object.values(programMap).sort((a, b) => a.name.localeCompare(b.name));
       } else if (user.role === 'admin') {
-        list = await pb.collection('programs').getFullList({ sort: 'name' });
+        list = await pb.collection('programs').getFullList({ sort: 'name', expand: 'faculty' });
       } else {
-        list = await pb.collection('programs').getFullList({ sort: 'name' });
+        list = await pb.collection('programs').getFullList({ sort: 'name', expand: 'faculty' });
       }
       setPrograms(list);
       

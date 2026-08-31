@@ -60,6 +60,7 @@ export default function InstructorReports() {
   // Tab 2 State (Program PÇ Raporu)
   const [cohortMatrix, setCohortMatrix] = useState({});
   const [programReportData, setProgramReportData] = useState(null);
+  const [progPcChartType, setProgPcChartType] = useState('bar'); // 'bar' (Sütun) | 'radar' (Radar)
 
   const printCourseRef = useRef(null);
   const printProgramRef = useRef(null);
@@ -987,9 +988,21 @@ export default function InstructorReports() {
         return agg.totalAkts > 0 ? +(agg.weightedSum / agg.totalAkts).toFixed(1) : 0;
       });
 
+      const termClassPairs = activeTerms.map(t => {
+        const checkedClasses = selectedCells
+          .filter(k => k.startsWith(t.id + '_'))
+          .map(k => k.split('_')[1])
+          .sort((a, b) => parseInt(a) - parseInt(b));
+        return {
+          term: t,
+          classes: checkedClasses
+        };
+      }).filter(pair => pair.classes.length > 0);
+
       setProgramReportData({
         pcs,
         selectedTerms: activeTerms,
+        termClassPairs,
         selectedClassIds: [...new Set(selectedCells.map(k => k.split('_')[1]))],
         coursePcRows,
         termSummaryMap,
@@ -1009,12 +1022,12 @@ export default function InstructorReports() {
   useEffect(() => {
     if (!programReportData) return;
 
-    let chartProgBarInstance = null;
-    let chartProgRadarInstance = null;
+    let chartProgPCInstance = null;
+    const ctx = document.getElementById('chartProgPC');
+    if (!ctx) return;
 
-    const ctxProgBar = document.getElementById('chartProgBar');
-    if (ctxProgBar) {
-      chartProgBarInstance = new Chart(ctxProgBar, {
+    if (progPcChartType === 'bar') {
+      chartProgPCInstance = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: programReportData.pcs.map(p => p.code),
@@ -1043,11 +1056,8 @@ export default function InstructorReports() {
           }
         }
       });
-    }
-
-    const ctxProgRadar = document.getElementById('chartProgRadar');
-    if (ctxProgRadar) {
-      chartProgRadarInstance = new Chart(ctxProgRadar, {
+    } else {
+      chartProgPCInstance = new Chart(ctx, {
         type: 'radar',
         data: {
           labels: programReportData.pcs.map(p => p.code),
@@ -1074,10 +1084,9 @@ export default function InstructorReports() {
     }
 
     return () => {
-      if (chartProgBarInstance) chartProgBarInstance.destroy();
-      if (chartProgRadarInstance) chartProgRadarInstance.destroy();
+      if (chartProgPCInstance) chartProgPCInstance.destroy();
     };
-  }, [programReportData]);
+  }, [programReportData, progPcChartType]);
 
   // PDF Export course report (Page-by-Page Direct Generation)
   const exportCourseReportPDF = async () => {
@@ -2639,34 +2648,57 @@ export default function InstructorReports() {
                  ======================================================== */}
               <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-6">
                 {/* PDF Header */}
-                <div className="text-center pb-4 border-b-2 border-outline-variant">
-                  <h2 className="text-2xl font-black text-[#0058be]">{selectedProgram.name}</h2>
+                <div className="text-center pb-4 border-b-2 border-outline-variant space-y-1">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kütahya Sağlık Bilimleri Üniversitesi</h3>
+                  {(selectedProgram?.expand?.faculty?.name || user?.expand?.faculty?.name) && (
+                    <h4 className="text-xs font-semibold text-slate-600">{selectedProgram?.expand?.faculty?.name || user?.expand?.faculty?.name}</h4>
+                  )}
+                  <h2 className="text-2xl font-black text-[#0058be] pt-1">{selectedProgram.name}</h2>
                   <h4 className="text-sm font-bold text-[#006c49] mt-1">
                     📅 Çoklu Dönem Program Çıktısı (PÇ) Değerlendirme Raporu
                   </h4>
-                  <div className="flex justify-center gap-1.5 mt-2.5 flex-wrap">
-                    {programReportData.selectedTerms.map(t => (
-                      <span key={t.id} className="inline-flex items-center justify-center bg-[#e3f2fd] text-[#1565c0] px-3 py-1.5 rounded-full text-xs font-bold border border-[#1565c0]/15 leading-none">{t.name}</span>
+                  <div className="flex justify-center gap-2 mt-3 flex-wrap">
+                    {programReportData.termClassPairs?.map(({ term, classes }) => (
+                      <span
+                        key={term.id}
+                        className="inline-flex items-center gap-1.5 bg-[#e3f2fd] text-[#1565c0] px-3.5 py-1.5 rounded-full text-xs font-bold border border-[#1565c0]/20 shadow-xs leading-none"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">calendar_month</span>
+                        <span>{term.name}:</span>
+                        <span className="text-[#0058be] font-extrabold">{classes.map(c => `${c}. Sınıf`).join(', ')}</span>
+                      </span>
                     ))}
-                    <span className="inline-flex items-center justify-center bg-[#fff3e0] text-[#e65100] px-3 py-1.5 rounded-full text-xs font-bold border border-[#e65100]/15 leading-none">
-                      {programReportData.selectedClassIds.map(c => `${c}. Sınıf`).join(', ')}
-                    </span>
                   </div>
                 </div>
 
-                {/* Multi-term aggregate charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                    <h4 className="text-sm font-bold text-on-surface mb-3">📊 PÇ Başarı Grafiği (Ağırlıklı Ortalama)</h4>
-                    <div className="relative h-[270px]">
-                      <canvas id="chartProgBar"></canvas>
+                {/* Multi-term aggregate chart */}
+                <div className="border border-outline-variant rounded-xl p-4 bg-white">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-on-surface">📊 Program Çıktısı (PÇ) Genel Başarı %</h4>
+                      <span className="text-[11px] font-semibold text-slate-400">Tüm Dönemler ve Dersler Ağırlıklı Ortalaması</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+                      <button
+                        onClick={() => setProgPcChartType('bar')}
+                        className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${progPcChartType === 'bar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        title="Sütun Grafiği"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">bar_chart</span>
+                        Sütun
+                      </button>
+                      <button
+                        onClick={() => setProgPcChartType('radar')}
+                        className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 transition-all text-xs ${progPcChartType === 'radar' ? 'bg-white text-primary shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        title="Radar Grafiği"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">radar</span>
+                        Radar
+                      </button>
                     </div>
                   </div>
-                  <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                    <h4 className="text-sm font-bold text-on-surface mb-3">🕸️ PÇ Radar Görünümü</h4>
-                    <div className="relative h-[270px]">
-                      <canvas id="chartProgRadar"></canvas>
-                    </div>
+                  <div className="relative h-[290px]">
+                    <canvas id="chartProgPC"></canvas>
                   </div>
                 </div>
 
@@ -2713,7 +2745,10 @@ export default function InstructorReports() {
               <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
                 {/* Sub Header */}
                 <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
-                  <span className="font-bold text-sm text-[#0058be]">{selectedProgram.name}</span>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {selectedProgram.expand?.faculty?.name ? `• ${selectedProgram.expand.faculty.name}` : ''}</div>
+                    <span className="font-bold text-sm text-[#0058be]">{selectedProgram.name}</span>
+                  </div>
                   <span className="text-xs text-slate-500 font-semibold">
                     {programReportData.selectedTerms.map(t => t.name).join(' • ')}
                   </span>
@@ -2743,7 +2778,12 @@ export default function InstructorReports() {
                               <tr key={row.course.id} className={`hover:bg-slate-100/50 ${bg}`}>
                                 <td className="px-3 py-2 font-semibold text-slate-700">
                                   <span className="bg-[#0058be] text-white px-2 py-0.5 rounded text-[10px] font-bold mr-1.5">{row.course.code}</span>
-                                  {row.course.name} {row.course.sube ? `(Şube: ${row.course.sube})` : ''}
+                                  {row.course.name} {(() => {
+                                    const parts = [];
+                                    if (row.course.sinif) parts.push(`${row.course.sinif}. Sınıf`);
+                                    if (row.course.sube) parts.push(`Şube: ${row.course.sube}`);
+                                    return parts.length > 0 ? `(${parts.join(', ')})` : '';
+                                  })()}
                                 </td>
                                 <td className="px-3 py-2 text-center text-slate-500 font-bold">{row.akts}</td>
                                 {programReportData.pcs.map(pc => {
