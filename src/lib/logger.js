@@ -48,18 +48,26 @@ export async function logAction({ action, category, details, metadata = null, us
     }
 
     const payload = {
-      user: userId,
       user_name: userName,
       user_role: userRole,
       action: action || LOG_ACTIONS.UPDATE,
       category: category || LOG_CATEGORIES.SYSTEM,
       details: details || '',
-      metadata: metadata || null,
     };
 
-    // Non-blocking fire-and-forget
-    pb.collection('logs').create(payload).catch(err => {
-      console.warn('[AuditLogger] Could not record log entry:', err?.message || err);
+    if (userId) {
+      payload.user = userId;
+    }
+
+    if (metadata && typeof metadata === 'object') {
+      payload.metadata = metadata;
+    }
+
+    // Fire-and-forget log creation
+    pb.collection('logs').create(payload).then(() => {
+      console.log('[AuditLogger] Log saved successfully:', payload.action, payload.details);
+    }).catch(err => {
+      console.warn('[AuditLogger] Could not record log entry:', err?.message || err, payload);
     });
   } catch (err) {
     console.warn('[AuditLogger] Error preparing log:', err);

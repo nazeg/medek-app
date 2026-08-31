@@ -54,9 +54,7 @@ export default function AdminLogs() {
       const res = await pb.collection('logs').getList(page, perPage, {
         sort: '-created',
         filter: filterConditions.length > 0 ? filterConditions.join(' && ') : '',
-        expand: 'user'
       }).catch(err => {
-        // If collection doesn't exist yet, return empty list gracefully
         console.warn('Logs query fallback:', err);
         return { items: [], totalItems: 0 };
       });

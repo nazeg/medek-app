@@ -1,70 +1,142 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
-  const usersCollection = app.findCollectionByNameOrId("users");
+  const snapshot = [
+    {
+      "id": "pbc_logs_audit_table",
+      "name": "logs",
+      "type": "base",
+      "system": false,
+      "listRule": "@request.auth.id != ''",
+      "viewRule": "@request.auth.id != ''",
+      "createRule": "@request.auth.id != ''",
+      "updateRule": null,
+      "deleteRule": "@request.auth.id != ''",
+      "indexes": [],
+      "fields": [
+        {
+          "autogeneratePattern": "[a-z0-9]{15}",
+          "help": "",
+          "hidden": false,
+          "id": "text3208210256",
+          "max": 15,
+          "min": 15,
+          "name": "id",
+          "pattern": "^[a-z0-9]+$",
+          "presentable": false,
+          "primaryKey": true,
+          "required": true,
+          "system": true,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text_log_username",
+          "max": 0,
+          "min": 0,
+          "name": "user_name",
+          "pattern": "",
+          "presentable": true,
+          "primaryKey": false,
+          "required": false,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text_log_userrole",
+          "max": 0,
+          "min": 0,
+          "name": "user_role",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": false,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text_log_action",
+          "max": 0,
+          "min": 0,
+          "name": "action",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": false,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text_log_category",
+          "max": 0,
+          "min": 0,
+          "name": "category",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": false,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text_log_details",
+          "max": 0,
+          "min": 0,
+          "name": "details",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": false,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "hidden": false,
+          "id": "json_log_metadata",
+          "maxSize": 0,
+          "name": "metadata",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        },
+        {
+          "cascadeDelete": false,
+          "collectionId": "_pb_users_auth_",
+          "help": "",
+          "hidden": false,
+          "id": "relation_log_user",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "user",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "relation"
+        }
+      ]
+    }
+  ];
 
-  const collection = new Collection({
-    name: "logs",
-    type: "base",
-    createRule: "",
-    listRule: "@request.auth.role = 'admin'",
-    viewRule: "@request.auth.role = 'admin'",
-    updateRule: null,
-    deleteRule: "@request.auth.role = 'admin'",
-    fields: [
-      new TextField({
-        name: "user_name",
-        type: "text",
-        required: false,
-        presentable: true
-      }),
-      new TextField({
-        name: "user_role",
-        type: "text",
-        required: false,
-        presentable: false
-      }),
-      new TextField({
-        name: "action",
-        type: "text",
-        required: false,
-        presentable: false
-      }),
-      new TextField({
-        name: "category",
-        type: "text",
-        required: false,
-        presentable: false
-      }),
-      new TextField({
-        name: "details",
-        type: "text",
-        required: false,
-        presentable: false
-      }),
-      new JSONField({
-        name: "metadata",
-        type: "json",
-        required: false,
-        presentable: false
-      }),
-      new RelationField({
-        name: "user",
-        type: "relation",
-        required: false,
-        presentable: false,
-        cascadeDelete: false,
-        collectionId: usersCollection.id,
-        maxSelect: 1
-      })
-    ]
-  });
-
-  return app.save(collection);
+  return app.importCollections(snapshot, false);
 }, (app) => {
   try {
     const collection = app.findCollectionByNameOrId("logs");
     return app.delete(collection);
   } catch (e) {
-    return;
+    return null;
   }
 });
