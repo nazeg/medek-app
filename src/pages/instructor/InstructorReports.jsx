@@ -17,7 +17,7 @@ export default function InstructorReports() {
   const { alert } = useAlertConfirm();
   const { user } = useAuth();
   const { activeTerm } = useTerm();
-  const { activeProgram } = useProgram();
+  const { activeProgram, programs } = useProgram();
 
   // Tab State: 'course' = Detaylı Analiz, 'program' = Program PÇ Dönem Raporu
   const [activeTab, setActiveTab] = useState('course');
