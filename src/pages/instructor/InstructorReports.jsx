@@ -899,9 +899,10 @@ export default function InstructorReports() {
 
             if (dcs.length === 0 || questions.length === 0 || students.length === 0) continue;
 
-            const allTypes = [...new Set(questions.map(q => q.expand?.exam?.type))];
+            const allTypes = [...new Set(questions.map(q => q.expand?.exam?.type).filter(Boolean))];
             const hasFinal = allTypes.includes('Final');
-            const useExams = allTypes.filter(et => et && !(et === 'Bütünleme' && hasFinal));
+            const hasBut = allTypes.includes('Bütünleme');
+            const useExams = allTypes.filter(et => !(et === 'Bütünleme' && hasFinal));
 
             const pctMap = {
               'Vize': course.pct_vize ?? 40,
@@ -926,21 +927,27 @@ export default function InstructorReports() {
             });
 
             students.forEach(o => {
-              questions.forEach(q => {
-                const examType = q.expand?.exam?.type;
-                if (!useExams.includes(examType)) return;
+              useExams.forEach(et => {
+                let effectiveExam = et;
+                if (et === 'Final' && hasBut) {
+                  const tookBut = hasStudentTakenExam(o.id, 'Bütünleme', questions, grades);
+                  if (tookBut) effectiveExam = 'Bütünleme';
+                }
 
-                const qDcCodes = getQuestionDcCodes(q);
-                if (qDcCodes.length === 0) return;
+                const examQuestions = questions.filter(q => q.expand?.exam?.type === effectiveExam);
+                examQuestions.forEach(q => {
+                  const qDcCodes = getQuestionDcCodes(q);
+                  if (qDcCodes.length === 0) return;
 
-                const grade = grades.find(g => g.student === o.id && g.question === q.id);
-                const score = getQuestionScore(q, grade);
+                  const grade = grades.find(g => g.student === o.id && g.question === q.id);
+                  const score = getQuestionScore(q, grade);
 
-                qDcCodes.forEach(code => {
-                  if (dcExamSonuc[code] && dcExamSonuc[code][examType]) {
-                    dcExamSonuc[code][examType].alinan += Number(score);
-                    dcExamSonuc[code][examType].max += Number(q.max_score);
-                  }
+                  qDcCodes.forEach(code => {
+                    if (dcExamSonuc[code] && dcExamSonuc[code][et]) {
+                      dcExamSonuc[code][et].alinan += Number(score);
+                      dcExamSonuc[code][et].max += Number(q.max_score);
+                    }
+                  });
                 });
               });
             });
