@@ -82,10 +82,6 @@ export default function Terms() {
       }
     }
   };
-        await alert('Dönem silinemedi. Lütfen önce bu döneme bağlı dersleri silin veya güncelleyin.', 'Hata', 'error');
-      }
-    }
-  };
 
   return (
     <>
