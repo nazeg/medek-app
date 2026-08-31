@@ -130,49 +130,16 @@ export default function InstructorReports() {
   }, [user, activeTerm, activeProgram, isInstructorView]);
 
   useEffect(() => {
-    if (!user) return;
-
-    let progPromise;
-    if (user.role === 'program_head') {
-      progPromise = pb.collection('programs').getFullList({
-        sort: 'name',
-        filter: `head = "${user.id}"`
-      });
-    } else if (user.role === 'coordinator') {
-      progPromise = pb.collection('programs').getFullList({
-        sort: 'name',
-        filter: user.faculty ? `faculty = "${user.faculty}"` : undefined
-      });
-    } else if (user.role === 'instructor') {
-      progPromise = pb.collection('courses').getFullList({
-        filter: `instructor ~ "${user.id}" || instructor ?= "${user.id}"`,
-        expand: 'program'
-      }).then(courses => {
-        const pMap = {};
-        courses.forEach(c => {
-          if (c.expand?.program) {
-            pMap[c.expand.program.id] = c.expand.program;
-          }
-        });
-        return Object.values(pMap).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
-      });
+    if (!programs) return;
+    setProgramsList(programs);
+    if (activeProgram && programs.some(p => p.id === activeProgram.id)) {
+      setSelectedProgram(programs.find(p => p.id === activeProgram.id));
+    } else if (programs.length > 0) {
+      setSelectedProgram(programs[0]);
     } else {
-      progPromise = pb.collection('programs').getFullList({ sort: 'name' });
+      setSelectedProgram(null);
     }
-
-    progPromise.then(list => {
-      setProgramsList(list);
-      if (activeProgram && list.some(p => p.id === activeProgram.id)) {
-        setSelectedProgram(list.find(p => p.id === activeProgram.id));
-      } else if (list.length > 0) {
-        setSelectedProgram(list[0]);
-      } else {
-        setSelectedProgram(null);
-      }
-    }).catch(err => {
-      console.error('Error loading programs:', err);
-    });
-  }, [user, activeProgram]);
+  }, [programs, activeProgram]);
 
   // Load available exams and questions for selectedCourse
   useEffect(() => {

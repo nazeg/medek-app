@@ -28,20 +28,24 @@ export default function CoordinatorDashboard() {
       try {
         setLoading(true);
 
-        const isCoordinator = user.role === 'coordinator';
-        
-        // Base program filter
-        let progFilter = isCoordinator
-          ? `faculty = "${user.faculty}"`
-          : `head = "${user.id}"`;
-
         const targetProgId = activeProgram?.id;
 
         // Fetch programs list for this user
-        const progsRes = await pb.collection('programs').getFullList({
-          sort: 'name',
-          filter: progFilter,
-        }).catch(() => []);
+        let progsRes = [];
+        if (user.role === 'coordinator' || user.role === 'program_head') {
+          const headPrograms = await pb.collection('programs').getFullList({ 
+            sort: 'name',
+            filter: `head = "${user.id}"`
+          }).catch(() => []);
+          if (headPrograms.length > 0) {
+            progsRes = headPrograms;
+          } else if (user.role === 'coordinator' && user.faculty) {
+            progsRes = await pb.collection('programs').getFullList({ 
+              sort: 'name',
+              filter: `faculty = "${user.faculty}"`
+            }).catch(() => []);
+          }
+        }
 
         // Course filter based on targetProgId and activeTerm
         let courseFilter = '';
