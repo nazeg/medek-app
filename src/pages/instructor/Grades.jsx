@@ -631,7 +631,7 @@ export default function Grades() {
                       <th className="px-4 py-3 border-b border-outline-variant">Ad Soyad</th>
                       {questions.map((q, i) => (
                         <th key={q.id} className="px-3 py-3 text-center border-b border-outline-variant">
-                          {q.code || `S${q.number}`}<br/><span className="text-[9px] font-normal">{(Array.isArray(q.course_outcome) ? q.course_outcome.length > 0 : !!q.course_outcome) ? 'DÇ' : ''}</span>
+                          {q.code || `S${q.number}`}
                           <span className="block text-[9px] font-normal">({q.max_score}p)</span>
                         </th>
                       ))}
