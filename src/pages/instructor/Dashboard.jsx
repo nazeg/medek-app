@@ -59,25 +59,32 @@ export default function InstructorDashboard() {
 
         let dcsCount = 0;
         let examsCount = 0;
+        let studentsCount = 0;
         const courseStats = {};
 
         if (filteredCourses.length > 0) {
           const courseIdsFilter = filteredCourses.map(c => `course = "${c.id}"`).join(' || ');
           
-          const [dcsList, examsList, allStudentsList] = await Promise.all([
+          const [dcsList, examsList, questionsList, allStudentsList] = await Promise.all([
             pb.collection('course_outcomes').getFullList({
               filter: courseIdsFilter,
-            }),
+            }).catch(() => []),
             pb.collection('exams').getFullList({
               filter: courseIdsFilter,
-            }),
+            }).catch(() => []),
+            pb.collection('questions').getFullList({
+              filter: filteredCourses.map(c => `exam.course = "${c.id}"`).join(' || '),
+            }).catch(() => []),
             pb.collection('students').getFullList({
               sort: 'number'
             }).catch(() => [])
           ]);
 
           dcsCount = dcsList.length;
-          examsCount = examsList.length;
+          
+          // Count distinct exams that have questions; if none have questions yet, count total exams created for the courses
+          const examsWithQuestions = examsList.filter(e => questionsList.some(q => q.exam === e.id));
+          examsCount = examsWithQuestions.length > 0 ? examsWithQuestions.length : examsList.length;
 
           // Fetch student grades to calculate per-course student counts
           let studentGradesList = [];
@@ -88,29 +95,36 @@ export default function InstructorDashboard() {
             }).catch(() => []);
           }
 
-          // Map stats to each course
+          // Map stats to each course and collect distinct students in the selected program & term
+          const distinctAllSelectedStudents = new Set();
+
           filteredCourses.forEach(c => {
             const courseDcs = dcsList.filter(d => d.course === c.id);
             const courseExams = examsList.filter(e => e.course === c.id);
             const courseExamIds = new Set(courseExams.map(e => e.id));
-            const distinctStudents = new Set(studentGradesList.filter(g => courseExamIds.has(g.exam)).map(g => g.student));
+            const distinctCourseStudents = new Set(studentGradesList.filter(g => courseExamIds.has(g.exam)).map(g => g.student));
             const enrolledStudents = allStudentsList.filter(s => Array.isArray(s.courses) && s.courses.includes(c.id));
-            const count = enrolledStudents.length > 0 ? enrolledStudents.length : distinctStudents.size;
+            
+            enrolledStudents.forEach(s => {
+              distinctCourseStudents.add(s.id);
+              distinctAllSelectedStudents.add(s.id);
+            });
+            distinctCourseStudents.forEach(id => distinctAllSelectedStudents.add(id));
 
             courseStats[c.id] = {
               dcs: courseDcs.length,
-              studentsCount: count
+              studentsCount: distinctCourseStudents.size
             };
           });
-        }
 
-        const studentsRes = await pb.collection('students').getList(1, 1);
+          studentsCount = distinctAllSelectedStudents.size;
+        }
 
         setStats({
           coursesCount: filteredCourses.length,
           outcomesCount: dcsCount,
           examsCount: examsCount,
-          studentsCount: studentsRes.totalItems
+          studentsCount: studentsCount
         });
 
         setCoursesWithStats(filteredCourses.map(c => ({
@@ -182,7 +196,7 @@ export default function InstructorDashboard() {
       border: 'border-[#D97706]/20',
     },
     {
-      label: 'Sistem Öğrencileri',
+      label: 'Kayıtlı Öğrenciler',
       value: stats.studentsCount,
       icon: 'group',
       color: 'text-[#059669]',
