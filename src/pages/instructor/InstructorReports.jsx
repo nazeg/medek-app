@@ -1038,7 +1038,7 @@ export default function InstructorReports() {
 
       const finalPcData = pcs.map(pc => {
         const agg = pcAggregate[pc.code];
-        return agg.totalAkts > 0 ? +(agg.weightedSum / agg.totalAkts).toFixed(1) : 0;
+        return agg.totalAkts > 0 ? +(agg.weightedSum / agg.totalAkts).toFixed(2) : 0;
       });
 
       const termClassPairs = activeTerms.map(t => {
@@ -1099,13 +1099,22 @@ export default function InstructorReports() {
             datalabels: {
               anchor: 'end',
               align: 'top',
-              formatter: v => Math.round(v) + '%',
-              font: { weight: 'bold', size: 10 },
+              formatter: v => '%' + (Number(v) || 0).toFixed(2).replace('.', ','),
+              font: { weight: 'bold', size: 12 },
               color: '#0b1c30'
             }
           },
           scales: {
-            y: { beginAtZero: true, max: 100 }
+            y: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                callback: v => '%' + v
+              }
+            },
+            x: {
+              grid: { display: false }
+            }
           }
         }
       });
@@ -1119,7 +1128,9 @@ export default function InstructorReports() {
             data: programReportData.finalPcData,
             borderColor: '#0058be',
             backgroundColor: 'rgba(0, 88, 190, 0.15)',
-            fill: true
+            fill: true,
+            pointBackgroundColor: '#0058be',
+            pointRadius: 4
           }]
         },
         options: {
@@ -1127,7 +1138,14 @@ export default function InstructorReports() {
           maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            datalabels: { display: false }
+            datalabels: {
+              formatter: v => '%' + (Number(v) || 0).toFixed(2).replace('.', ','),
+              font: { weight: 'bold', size: 11 },
+              color: '#0058be',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              borderRadius: 4,
+              padding: { top: 2, bottom: 2, left: 4, right: 4 }
+            }
           },
           scales: {
             r: { min: 0, max: 100 }
@@ -2785,7 +2803,7 @@ export default function InstructorReports() {
                               <td className="px-3 py-2 font-bold text-primary">{pc.code}</td>
                               <td className="px-3 py-2 text-slate-500 font-semibold">{pc.description}</td>
                               <td className={`px-3 py-2 text-center font-bold ${getColorByValue(val)}`}>
-                                {val}%
+                                %{Number(val).toFixed(2).replace('.', ',')}
                               </td>
                             </tr>
                           );
