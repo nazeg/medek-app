@@ -1082,15 +1082,15 @@ export default function InstructorReports() {
       let opinionFound = false;
       try {
         const evals = await pb.collection('program_evaluations').getFullList({
-          filter: pb.filter('program = {:prog} && (term_key = {:tk1} || term_key = {:tk2})', {
-            prog: selectedProgram.id,
-            tk1: cohortKey,
-            tk2: legacyCohortKey
-          }),
+          filter: pb.filter('program = {:prog}', { prog: selectedProgram.id }),
           sort: '-created'
         });
-        if (evals.length > 0) {
-          const ev = evals[0];
+        const ev = evals.find(e => 
+          e.term_key === cohortKey || 
+          e.term_key === legacyCohortKey || 
+          e.term_key === activeTerms.map(t => t.id).sort().join(',')
+        );
+        if (ev) {
           setOpinionRecordId(ev.id);
           setHeadOpinion(ev.opinion || '');
           setEvaluatorName(ev.evaluator_name || user?.name || '');
