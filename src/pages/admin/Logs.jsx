@@ -36,13 +36,13 @@ export default function AdminLogs() {
         const now = new Date();
         if (timeFilter === 'TODAY') {
           const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-          filterConditions.push(`created >= "${startOfToday}"`);
+          filterConditions.push(`(created_at >= "${startOfToday}" || created >= "${startOfToday}")`);
         } else if (timeFilter === 'WEEK') {
           const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-          filterConditions.push(`created >= "${sevenDaysAgo}"`);
+          filterConditions.push(`(created_at >= "${sevenDaysAgo}" || created >= "${sevenDaysAgo}")`);
         } else if (timeFilter === 'MONTH') {
           const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-          filterConditions.push(`created >= "${thirtyDaysAgo}"`);
+          filterConditions.push(`(created_at >= "${thirtyDaysAgo}" || created >= "${thirtyDaysAgo}")`);
         }
       }
 
@@ -52,7 +52,7 @@ export default function AdminLogs() {
       }
 
       const queryOptions = {
-        sort: '-created',
+        sort: '-created_at',
       };
       if (filterConditions.length > 0) {
         queryOptions.filter = filterConditions.join(' && ');
@@ -62,7 +62,6 @@ export default function AdminLogs() {
       try {
         res = await pb.collection('logs').getList(page, perPage, queryOptions);
       } catch (e1) {
-        // Fallback without sort if created field is still migrating
         try {
           const fallbackOptions = { ...queryOptions };
           delete fallbackOptions.sort;
@@ -104,8 +103,8 @@ export default function AdminLogs() {
     const categoryActivityMap = {};
 
     logs.forEach(l => {
-      const createdTime = new Date(l.created).getTime();
-      if (createdTime >= startOfToday) {
+      const d = parseDate(l.created_at || l.created || l.updated);
+      if (d && d.getTime() >= startOfToday) {
         todayCount++;
       }
       const uName = l.user_name || 'Bilinmeyen';
@@ -135,15 +134,18 @@ export default function AdminLogs() {
       return;
     }
 
-    const exportData = logs.map(l => ({
-      'Tarih / Saat': new Date(l.created).toLocaleString('tr-TR'),
-      'Kullanıcı': l.user_name || '—',
-      'Rol': roleLabel(l.user_role),
-      'İşlem Türü': l.action || '—',
-      'Kategori': l.category || '—',
-      'Detay': l.details || '',
-      'Teknik Metadata': l.metadata ? JSON.stringify(l.metadata) : ''
-    }));
+    const exportData = logs.map(l => {
+      const d = parseDate(l.created_at || l.created || l.updated);
+      return {
+        'Tarih / Saat': d ? d.toLocaleString('tr-TR') : '—',
+        'Kullanıcı': l.user_name || '—',
+        'Rol': roleLabel(l.user_role),
+        'İşlem Türü': l.action || '—',
+        'Kategori': l.category || '—',
+        'Detay': l.details || '',
+        'Teknik Metadata': l.metadata ? JSON.stringify(l.metadata) : ''
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -576,7 +578,10 @@ export default function AdminLogs() {
               <div className="grid grid-cols-2 gap-3.5 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">İşlem Tarihi</span>
-                  <span className="text-slate-800 font-bold mt-0.5 block">{new Date(selectedLog.created).toLocaleString('tr-TR')}</span>
+                  <span className="text-slate-800 font-bold mt-0.5 block">{(() => {
+                    const d = parseDate(selectedLog.created_at || selectedLog.created || selectedLog.updated);
+                    return d ? d.toLocaleString('tr-TR') : '—';
+                  })()}</span>
                 </div>
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">İşlem Türü</span>

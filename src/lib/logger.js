@@ -53,6 +53,7 @@ export async function logAction({ action, category, details, metadata = null, us
       action: action || LOG_ACTIONS.UPDATE,
       category: category || LOG_CATEGORIES.SYSTEM,
       details: details || '',
+      created_at: new Date().toISOString(),
     };
 
     if (userId) {
