@@ -62,6 +62,11 @@ export function ProgramProvider({ children }) {
       } else {
         list = await pb.collection('programs').getFullList({ sort: 'name', expand: 'faculty' });
       }
+
+      if (user.role !== 'admin') {
+        list = list.filter(p => p.active !== false);
+      }
+
       setPrograms(list);
       
       // Determine default active program

@@ -13,6 +13,7 @@ export default function TopNavbar({ title, subtitle }) {
 
   const isInstructorView = location.pathname.startsWith('/instructor') || user?.role === 'instructor';
   const showProgramSelector = user && (user.role === 'coordinator' || user.role === 'program_head' || user.role === 'instructor');
+  const showTermSelector = user && user.role !== 'admin' && !location.pathname.startsWith('/admin');
 
   return (
     <header className="h-16 fixed top-0 right-0 left-[260px] bg-white border-b border-outline-variant flex justify-end items-center px-margin-desktop z-40">
@@ -34,20 +35,22 @@ export default function TopNavbar({ title, subtitle }) {
           </div>
         )}
 
-        <div className="flex items-center gap-2 bg-slate-50 border border-outline-variant rounded-lg px-3 py-1.5 hover:bg-slate-100 transition-colors">
-          <span className="material-symbols-outlined text-primary text-lg">calendar_month</span>
-          <select
-            value={activeTerm?.id || ''}
-            onChange={(e) => selectTerm(e.target.value)}
-            className="bg-transparent border-none text-sm font-semibold text-on-surface focus:outline-none focus:ring-0 focus:ring-transparent cursor-pointer py-0"
-          >
-            {terms.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {showTermSelector && (
+          <div className="flex items-center gap-2 bg-slate-50 border border-outline-variant rounded-lg px-3 py-1.5 hover:bg-slate-100 transition-colors">
+            <span className="material-symbols-outlined text-primary text-lg">calendar_month</span>
+            <select
+              value={activeTerm?.id || ''}
+              onChange={(e) => selectTerm(e.target.value)}
+              className="bg-transparent border-none text-sm font-semibold text-on-surface focus:outline-none focus:ring-0 focus:ring-transparent cursor-pointer py-0"
+            >
+              {terms.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
     </header>
   );

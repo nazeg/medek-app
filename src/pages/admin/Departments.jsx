@@ -16,7 +16,7 @@ export default function Departments() {
   const [editItem, setEditItem] = useState(null);
   
   // Form state
-  const [form, setForm] = useState({ name: '', faculty: '', duration: '4', head: '' });
+  const [form, setForm] = useState({ name: '', faculty: '', duration: '4', head: '', active: true });
 
   // Accordion state
   const [expandedFaculties, setExpandedFaculties] = useState({});
@@ -67,7 +67,8 @@ export default function Departments() {
         name: form.name, 
         faculty: form.faculty, 
         duration: form.duration, 
-        head: form.head || ''
+        head: form.head || '',
+        active: form.active !== false
       };
       
       const targetFaculty = faculties.find(f => f.id === form.faculty);
@@ -78,25 +79,41 @@ export default function Departments() {
         logAction({
           action: LOG_ACTIONS.UPDATE,
           category: LOG_CATEGORIES.FACULTY_DEPT,
-          details: `"${form.name}" programı güncellendi. Fakülte: ${targetFaculty?.name || '—'}, Bölüm Başkanı: ${headUser?.name || 'Atanmadı'}`,
-          metadata: { programId: editItem.id, name: form.name, faculty: targetFaculty?.name, head: headUser?.name }
+          details: `"${form.name}" programı güncellendi. Durum: ${form.active !== false ? 'Aktif' : 'Pasif'}, Fakülte: ${targetFaculty?.name || '—'}, Bölüm Başkanı: ${headUser?.name || 'Atanmadı'}`,
+          metadata: { programId: editItem.id, name: form.name, faculty: targetFaculty?.name, head: headUser?.name, active: form.active !== false }
         });
       } else {
         const res = await pb.collection('programs').create(data);
         logAction({
           action: LOG_ACTIONS.CREATE,
           category: LOG_CATEGORIES.FACULTY_DEPT,
-          details: `"${form.name}" adlı yeni program ekalendi. Fakülte: ${targetFaculty?.name || '—'}, Bölüm Başkanı: ${headUser?.name || 'Atanmadı'}`,
-          metadata: { programId: res.id, name: form.name, faculty: targetFaculty?.name, head: headUser?.name }
+          details: `"${form.name}" adlı yeni program eklendi. Durum: ${form.active !== false ? 'Aktif' : 'Pasif'}, Fakülte: ${targetFaculty?.name || '—'}, Bölüm Başkanı: ${headUser?.name || 'Atanmadı'}`,
+          metadata: { programId: res.id, name: form.name, faculty: targetFaculty?.name, head: headUser?.name, active: form.active !== false }
         });
       }
       
       setShowModal(false);
       setEditItem(null);
-      setForm({ name: '', faculty: '', duration: '4', head: '' });
+      setForm({ name: '', faculty: '', duration: '4', head: '', active: true });
       load();
     } catch (err) {
       await alert('Bölüm/Program kaydedilirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
+    }
+  };
+
+  const toggleActive = async (prog) => {
+    const nextState = prog.active === false ? true : false;
+    try {
+      await pb.collection('programs').update(prog.id, { active: nextState });
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.FACULTY_DEPT,
+        details: `"${prog.name}" bölüm/program durumu ${nextState ? 'Aktif' : 'Pasif'} yapıldı.`,
+        metadata: { programId: prog.id, name: prog.name, active: nextState }
+      });
+      load();
+    } catch (err) {
+      await alert('Durum güncellenirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
     }
   };
 
@@ -118,22 +135,99 @@ export default function Departments() {
     }
   };
 
+  const renderProgramCard = (p) => {
+    const isPassive = p.active === false;
+    return (
+      <div 
+        key={p.id} 
+        className={`border rounded-lg p-3 flex items-center justify-between text-xs transition-all ${
+          isPassive 
+            ? 'bg-slate-50 border-dashed border-slate-300 opacity-75' 
+            : 'bg-white border-outline-variant hover:border-primary/30'
+        }`}
+      >
+        <div className="flex-1 min-w-0 pr-2">
+          <div className="flex items-center gap-2">
+            <p className={`font-bold text-sm truncate ${isPassive ? 'text-slate-500 line-through' : 'text-on-surface'}`}>
+              {p.name}
+            </p>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border leading-none ${
+              isPassive 
+                ? 'bg-slate-200 text-slate-600 border-slate-300' 
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }`}>
+              {isPassive ? 'Pasif (Kapalı)' : 'Aktif'}
+            </span>
+          </div>
+          <p className="text-[11px] text-on-surface-variant mt-1">
+            Süre: {p.duration} Yıl • Sorumlu: <span className={p.expand?.head ? "font-medium text-slate-700" : "font-semibold text-red-600"}>{p.expand?.head ? (p.expand.head.title ? `${p.expand.head.title} ${p.expand.head.name}` : p.expand.head.name) : 'Atanmamış'}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Active / Passive Toggle Switch */}
+          <button
+            type="button"
+            onClick={() => toggleActive(p)}
+            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              !isPassive ? 'bg-emerald-600' : 'bg-slate-300'
+            }`}
+            title={isPassive ? 'Aktif Yap (Kullanıma Aç)' : 'Pasif Yap (Kapat/Arşivle)'}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                !isPassive ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+
+          {/* Edit Button */}
+          <button 
+            onClick={() => {
+              setEditItem(p);
+              setForm({ 
+                name: p.name, 
+                faculty: p.faculty, 
+                duration: p.duration, 
+                head: p.head || '',
+                active: p.active !== false
+              });
+              setShowModal(true);
+            }}
+            className="p-1 hover:bg-slate-100 rounded text-on-surface-variant transition-colors cursor-pointer"
+            title="Düzenle"
+          >
+            <span className="material-symbols-outlined text-base">edit</span>
+          </button>
+
+          {/* Delete Button */}
+          <button 
+            onClick={() => handleDelete(p.id)}
+            className="p-1 hover:bg-red-50 rounded text-error transition-colors cursor-pointer"
+            title="Sil"
+          >
+            <span className="material-symbols-outlined text-base">delete</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="flex justify-between items-end mb-6">
         <div>
           <h2 className="text-headline-lg text-on-surface">Bölüm / Program Yönetimi</h2>
           <p className="text-on-surface-variant mt-1 font-body-md">
-            Fakülte ve MYO bünyesindeki bölüm/programların yönetimi
+            Fakülte ve MYO bünyesindeki bölüm/programların aktif/pasif durumları ve yönetimi
           </p>
         </div>
         <button 
           onClick={() => { 
             setEditItem(null); 
-            setForm({ name: '', faculty: '', duration: '4', head: '' }); 
+            setForm({ name: '', faculty: '', duration: '4', head: '', active: true }); 
             setShowModal(true); 
           }} 
-          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-md shadow-primary/20 hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95"
+          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-md shadow-primary/20 hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
         >
           <span className="material-symbols-outlined text-lg">add</span> Bölüm / Program Ekle
         </button>
@@ -154,7 +248,7 @@ export default function Departments() {
               <div key={faculty.id} className="bg-white rounded-xl border border-outline-variant overflow-hidden shadow-sm">
                 <button 
                   onClick={() => toggleFaculty(faculty.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left"
+                  className="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left cursor-pointer"
                 >
                   <span className="font-bold text-on-surface text-sm sm:text-base pr-2">{faculty.name}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -172,34 +266,7 @@ export default function Departments() {
                 
                 {isExpanded && (
                   <div className="p-4 border-t border-outline-variant bg-surface-container-lowest/30 space-y-2">
-                    {facultyProgs.map((p) => (
-                      <div key={p.id} className="bg-white border border-outline-variant rounded p-3 flex items-center justify-between text-xs hover:border-primary/30 transition-colors">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="font-bold text-on-surface text-sm truncate">{p.name}</p>
-                          <p className="text-[11px] text-on-surface-variant mt-1">
-                            Süre: {p.duration} Yıl • Sorumlu: <span className={p.expand?.head ? "font-medium" : "font-semibold text-red-700"}>{p.expand?.head ? (p.expand.head.title ? `${p.expand.head.title} ${p.expand.head.name}` : p.expand.head.name) : 'Atanmamış'}</span>
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button 
-                            onClick={() => {
-                              setEditItem(p);
-                              setForm({ name: p.name, faculty: p.faculty, duration: p.duration, head: p.head || '' });
-                              setShowModal(true);
-                            }}
-                            className="p-1 hover:bg-slate-100 rounded text-on-surface-variant transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-base">edit</span>
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(p.id)}
-                            className="p-1 hover:bg-red-50 rounded text-error transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-base">delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {facultyProgs.map(renderProgramCard)}
                     {facultyProgs.length === 0 && (
                       <p className="text-xs text-on-surface-variant italic py-1">Henüz bölüm/program bulunmamaktadır.</p>
                     )}
@@ -224,7 +291,7 @@ export default function Departments() {
               <div key={faculty.id} className="bg-white rounded-xl border border-outline-variant overflow-hidden shadow-sm">
                 <button 
                   onClick={() => toggleFaculty(faculty.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left"
+                  className="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left cursor-pointer"
                 >
                   <span className="font-bold text-on-surface text-sm sm:text-base pr-2">{faculty.name}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -242,34 +309,7 @@ export default function Departments() {
 
                 {isExpanded && (
                   <div className="p-4 border-t border-outline-variant bg-surface-container-lowest/30 space-y-2">
-                    {facultyProgs.map((p) => (
-                      <div key={p.id} className="bg-white border border-outline-variant rounded p-3 flex items-center justify-between text-xs hover:border-primary/30 transition-colors">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="font-bold text-on-surface text-sm truncate">{p.name}</p>
-                          <p className="text-[11px] text-on-surface-variant mt-1">
-                            Süre: {p.duration} Yıl • Sorumlu: <span className={p.expand?.head ? "font-medium" : "font-semibold text-red-700"}>{p.expand?.head ? (p.expand.head.title ? `${p.expand.head.title} ${p.expand.head.name}` : p.expand.head.name) : 'Atanmamış'}</span>
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button 
-                            onClick={() => {
-                              setEditItem(p);
-                              setForm({ name: p.name, faculty: p.faculty, duration: p.duration, head: p.head || '' });
-                              setShowModal(true);
-                            }}
-                            className="p-1 hover:bg-slate-100 rounded text-on-surface-variant transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-base">edit</span>
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(p.id)}
-                            className="p-1 hover:bg-red-50 rounded text-error transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-base">delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                    {facultyProgs.map(renderProgramCard)}
                     {facultyProgs.length === 0 && (
                       <p className="text-xs text-on-surface-variant italic py-1">Henüz bölüm/program bulunmamaktadır.</p>
                     )}
@@ -291,7 +331,7 @@ export default function Departments() {
           <div className="bg-white rounded-xl max-w-md w-full shadow-2xl border border-outline-variant">
             <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center">
               <h3 className="text-headline-md text-on-surface">{editItem ? 'Bölüm / Program Düzenle' : 'Yeni Bölüm / Program Ekle'}</h3>
-              <button onClick={() => setShowModal(false)} className="text-on-surface-variant hover:text-on-surface">
+              <button onClick={() => setShowModal(false)} className="text-on-surface-variant hover:text-on-surface cursor-pointer">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -301,7 +341,7 @@ export default function Departments() {
                 <select 
                   value={form.faculty} 
                   onChange={e => setForm({ ...form, faculty: e.target.value })} 
-                  className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white cursor-pointer"
                   required
                 >
                   <option value="">Seçiniz</option>
@@ -323,7 +363,7 @@ export default function Departments() {
                 <select 
                   value={form.duration} 
                   onChange={e => setForm({ ...form, duration: e.target.value })} 
-                  className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white cursor-pointer"
                 >
                   <option value="2">2 Yıl</option>
                   <option value="4">4 Yıl</option>
@@ -336,7 +376,7 @@ export default function Departments() {
                 <select 
                   value={form.head} 
                   onChange={e => setForm({ ...form, head: e.target.value })} 
-                  className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white cursor-pointer"
                 >
                   <option value="">Seçiniz (Atama yok)</option>
                   {users.map(u => (
@@ -346,10 +386,31 @@ export default function Departments() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Birim Durumu</label>
+                <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-outline-variant">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, active: !form.active })}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      form.active ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        form.active ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs font-bold ${form.active ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {form.active ? 'Aktif (Kullanımda)' : 'Pasif (Kapatıldı / Arşivlendi)'}
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="px-6 py-4 border-t border-outline-variant flex justify-end gap-3 bg-surface-container-low">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-on-surface hover:bg-surface bg-white">İptal</button>
-              <button onClick={handleSave} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary-container">Kaydet</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-on-surface hover:bg-surface bg-white cursor-pointer">İptal</button>
+              <button onClick={handleSave} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary-container cursor-pointer">Kaydet</button>
             </div>
           </div>
         </div>
