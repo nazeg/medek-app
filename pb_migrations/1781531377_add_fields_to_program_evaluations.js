@@ -51,11 +51,11 @@ migrate((app) => {
     }
   });
 
-  collection.listRule = "@request.auth.id != ''";
-  collection.viewRule = "@request.auth.id != ''";
-  collection.createRule = "@request.auth.role = 'program_head' || @request.auth.role = 'admin' || @request.auth.role = 'coordinator'";
-  collection.updateRule = "@request.auth.role = 'program_head' || @request.auth.role = 'admin' || @request.auth.role = 'coordinator'";
-  collection.deleteRule = "@request.auth.role = 'program_head' || @request.auth.role = 'admin'";
+  collection.listRule = "@request.auth.role = 'coordinator' || @request.auth.role = 'admin'";
+  collection.viewRule = "@request.auth.role = 'coordinator' || @request.auth.role = 'admin'";
+  collection.createRule = "@request.auth.role = 'coordinator' || @request.auth.role = 'admin'";
+  collection.updateRule = "@request.auth.role = 'coordinator' || @request.auth.role = 'admin'";
+  collection.deleteRule = "@request.auth.role = 'coordinator' || @request.auth.role = 'admin'";
 
   return app.save(collection);
 }, (app) => {

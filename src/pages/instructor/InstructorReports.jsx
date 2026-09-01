@@ -1070,7 +1070,8 @@ export default function InstructorReports() {
         };
       }).filter(pair => pair.classes.length > 0);
 
-      const cohortKey = selectedCells.slice().sort().join('|');
+      const cohortKey = selectedCells.slice().sort().join('___');
+      const legacyCohortKey = selectedCells.slice().sort().join('|');
       const localCacheKey = `medek_opinion_${selectedProgram.id}_${cohortKey}`;
       let cachedData = null;
       try {
@@ -1081,7 +1082,11 @@ export default function InstructorReports() {
       let opinionFound = false;
       try {
         const evals = await pb.collection('program_evaluations').getFullList({
-          filter: `program = "${selectedProgram.id}" && term_key = "${cohortKey}"`,
+          filter: pb.filter('program = {:prog} && (term_key = {:tk1} || term_key = {:tk2})', {
+            prog: selectedProgram.id,
+            tk1: cohortKey,
+            tk2: legacyCohortKey
+          }),
           sort: '-created'
         });
         if (evals.length > 0) {
@@ -1146,7 +1151,7 @@ export default function InstructorReports() {
   const handleSaveHeadOpinion = async () => {
     if (!selectedProgram || !programReportData) return;
     setSavingOpinion(true);
-    const cohortKey = programReportData.cohortKey || programReportData.selectedTerms.map(t => t.id).sort().join('|');
+    const cohortKey = programReportData.cohortKey || programReportData.selectedTerms.map(t => t.id).sort().join('___');
     const localCacheKey = `medek_opinion_${selectedProgram.id}_${cohortKey}`;
 
     const payload = {
