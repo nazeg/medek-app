@@ -1082,13 +1082,14 @@ export default function InstructorReports() {
       let opinionFound = false;
       try {
         const evals = await pb.collection('program_evaluations').getFullList({
-          filter: pb.filter('program = {:prog}', { prog: selectedProgram.id }),
           sort: '-created'
         });
         const ev = evals.find(e => 
-          e.term_key === cohortKey || 
-          e.term_key === legacyCohortKey || 
-          e.term_key === activeTerms.map(t => t.id).sort().join(',')
+          e.program === selectedProgram.id && (
+            e.term_key === cohortKey || 
+            e.term_key === legacyCohortKey || 
+            e.term_key === activeTerms.map(t => t.id).sort().join(',')
+          )
         );
         if (ev) {
           setOpinionRecordId(ev.id);
