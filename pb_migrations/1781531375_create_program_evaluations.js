@@ -3,11 +3,11 @@ migrate((app) => {
   try {
     const existing = app.findCollectionByNameOrId("program_evaluations");
     if (existing) {
-      existing.listRule = "@request.auth.id != ''";
-      existing.viewRule = "@request.auth.id != ''";
-      existing.createRule = "@request.auth.id != ''";
-      existing.updateRule = "@request.auth.id != ''";
-      existing.deleteRule = "@request.auth.id != ''";
+      existing.listRule = "";
+      existing.viewRule = "";
+      existing.createRule = "";
+      existing.updateRule = "";
+      existing.deleteRule = "";
       return app.save(existing);
     }
   } catch (e) {
@@ -17,11 +17,11 @@ migrate((app) => {
   const collection = new Collection({
     name: "program_evaluations",
     type: "base",
-    listRule: "@request.auth.id != ''",
-    viewRule: "@request.auth.id != ''",
-    createRule: "@request.auth.id != ''",
-    updateRule: "@request.auth.id != ''",
-    deleteRule: "@request.auth.id != ''",
+    listRule: "",
+    viewRule: "",
+    createRule: "",
+    updateRule: "",
+    deleteRule: "",
     fields: [
       new TextField({
         name: "program",

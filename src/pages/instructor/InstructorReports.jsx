@@ -9,6 +9,7 @@ import { Chart, registerables } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 Chart.register(...registerables, ChartDataLabels);
 
