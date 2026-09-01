@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import pb from '../lib/pocketbase';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../lib/logger';
 
 const AuthContext = createContext(null);
 
@@ -78,6 +79,21 @@ export function AuthProvider({ children }) {
     }
 
     setUser({ ...record });
+
+    // Log the successful user login event
+    logAction({
+      action: LOG_ACTIONS.LOGIN,
+      category: LOG_CATEGORIES.USER,
+      details: `"${record.title ? record.title + ' ' : ''}${record.name || record.email}" adlı kullanıcı sisteme başarıyla giriş yaptı.`,
+      metadata: {
+        userId: record.id,
+        email: record.email,
+        role: record.role,
+        department: record.departmentNames || null
+      },
+      user: record
+    });
+
     return record;
   }, []);
 

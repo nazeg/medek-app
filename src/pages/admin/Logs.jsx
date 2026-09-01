@@ -381,6 +381,7 @@ export default function AdminLogs() {
               className="border border-outline-variant rounded-lg px-3 py-2 text-xs font-semibold bg-white text-slate-700"
             >
               <option value="ALL">Tüm Eylemler</option>
+              <option value="LOGIN">Sisteme Giriş (LOGIN)</option>
               <option value="CREATE">Ekleme (CREATE)</option>
               <option value="UPDATE">Güncelleme (UPDATE)</option>
               <option value="DELETE">Silme (DELETE)</option>
