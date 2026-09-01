@@ -54,6 +54,7 @@ export default function CoordinatorDashboard() {
             ? `program = "${targetProgId}" && term = "${activeTerm.id}"`
             : `program = "${targetProgId}"`;
         } else {
+          const isCoordinator = user.role === 'coordinator' || user.role === 'admin';
           const baseProg = isCoordinator ? `program.faculty = "${user.faculty}"` : `program.head = "${user.id}"`;
           courseFilter = activeTerm?.id ? `${baseProg} && term = "${activeTerm.id}"` : baseProg;
         }
