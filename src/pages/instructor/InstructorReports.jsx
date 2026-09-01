@@ -61,6 +61,7 @@ export default function InstructorReports() {
   const [cohortMatrix, setCohortMatrix] = useState({});
   const [programReportData, setProgramReportData] = useState(null);
   const [progPcChartType, setProgPcChartType] = useState('bar'); // 'bar' (Sütun) | 'radar' (Radar)
+  const [progCompareTerm, setProgCompareTerm] = useState('ALL'); // 'ALL' | termId | 'MATRIX'
 
   const printCourseRef = useRef(null);
   const printProgramRef = useRef(null);
@@ -2940,25 +2941,74 @@ export default function InstructorReports() {
 
                 {/* PÇ Hedef ve Alt Sınır Karşılaştırma Bölümü */}
                 <div className="space-y-4 pt-6 border-t border-slate-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-lg">flag</span>
-                        🎯 Program Çıktıları Hedef & Başarı Karşılaştırma Tablosu
+                        🎯 Program Çıktıları Hedef & Başarı Karşılaştırma Analizi
                       </h4>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Gerçekleşen başarı oranlarının belirlenen alt sınır (%{programReportData.pcs[0]?.min_threshold ?? 50}) ve hedef başarı (%{programReportData.pcs[0]?.target_goal ?? 70}) değerleriyle karşılaştırmalı analizi
+                        PÇ bazında gerçekleşen başarı oranlarının alt sınır (%{programReportData.pcs[0]?.min_threshold ?? 50}) ve hedef (%{programReportData.pcs[0]?.target_goal ?? 70}) değerleriyle dönemsel ve kümülatif karşılaştırması
                       </p>
                     </div>
+
+                    {/* Term Scope Switcher */}
+                    {programReportData.selectedTerms.length > 1 && (
+                      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold overflow-x-auto max-w-full">
+                        <button
+                          type="button"
+                          onClick={() => setProgCompareTerm('ALL')}
+                          className={`px-3 py-1.5 rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                            progCompareTerm === 'ALL'
+                              ? 'bg-white text-primary shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          📊 Genel Ortalama
+                        </button>
+                        {programReportData.selectedTerms.map(term => (
+                          <button
+                            key={term.id}
+                            type="button"
+                            onClick={() => setProgCompareTerm(term.id)}
+                            className={`px-3 py-1.5 rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                              progCompareTerm === term.id
+                                ? 'bg-white text-primary shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            📅 {term.name}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setProgCompareTerm('MATRIX')}
+                          className={`px-3 py-1.5 rounded-md transition-all whitespace-nowrap cursor-pointer ${
+                            progCompareTerm === 'MATRIX'
+                              ? 'bg-primary text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          📋 Tüm Dönemler Matrisi
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Summary KPI Mini Cards */}
+                  {/* Summary KPI Mini Cards (Dynamic by Selected Term Scope) */}
                   {(() => {
                     let achievedCount = 0;
                     let warningCount = 0;
                     let criticalCount = 0;
+
                     programReportData.pcs.forEach((pc, i) => {
-                      const val = programReportData.finalPcData[i] || 0;
+                      let val = 0;
+                      if (progCompareTerm === 'ALL' || progCompareTerm === 'MATRIX') {
+                        val = programReportData.finalPcData[i] || 0;
+                      } else {
+                        const ts = programReportData.termSummaryMap[progCompareTerm]?.[pc.code];
+                        val = ts && ts.wAkts > 0 ? Number((ts.wSum / ts.wAkts).toFixed(1)) : 0;
+                      }
                       const minTh = pc.min_threshold ?? 50;
                       const target = pc.target_goal ?? 70;
                       if (val >= target) achievedCount++;
@@ -2966,138 +3016,295 @@ export default function InstructorReports() {
                       else criticalCount++;
                     });
 
+                    const currentScopeLabel = (() => {
+                      if (progCompareTerm === 'ALL' || progCompareTerm === 'MATRIX') {
+                        return programReportData.selectedTerms.length > 1 ? 'Genel (Tüm Dönemler Ortalaması)' : programReportData.selectedTerms[0]?.name;
+                      }
+                      const found = programReportData.selectedTerms.find(t => t.id === progCompareTerm);
+                      return found ? found.name : 'Seçili Dönem';
+                    })();
+
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam PÇ</span>
-                          <span className="text-lg font-black text-slate-800">{programReportData.pcs.length} Çıktı</span>
-                        </div>
-                        <div className="bg-emerald-50/60 p-3 rounded-lg border border-emerald-200">
-                          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
-                          <span className="text-lg font-black text-emerald-800">{achievedCount} PÇ (%{((achievedCount / (programReportData.pcs.length || 1)) * 100).toFixed(0)})</span>
-                        </div>
-                        <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200">
-                          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Geliştirilmeli (Eşik Üstü)</span>
-                          <span className="text-lg font-black text-amber-800">{warningCount} PÇ</span>
-                        </div>
-                        <div className="bg-rose-50/60 p-3 rounded-lg border border-rose-200">
-                          <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
-                          <span className="text-lg font-black text-rose-800">{criticalCount} PÇ</span>
+                      <div className="space-y-2">
+                        {programReportData.selectedTerms.length > 1 && (
+                          <div className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px]">event</span>
+                            İncelenen Kapsam: <span className="underline">{currentScopeLabel}</span>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam PÇ</span>
+                            <span className="text-lg font-black text-slate-800">{programReportData.pcs.length} Çıktı</span>
+                          </div>
+                          <div className="bg-emerald-50/60 p-3 rounded-lg border border-emerald-200">
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
+                            <span className="text-lg font-black text-emerald-800">{achievedCount} PÇ (%{((achievedCount / (programReportData.pcs.length || 1)) * 100).toFixed(0)})</span>
+                          </div>
+                          <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200">
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Eşik Üstü (Geliştirilmeli)</span>
+                            <span className="text-lg font-black text-amber-800">{warningCount} PÇ</span>
+                          </div>
+                          <div className="bg-rose-50/60 p-3 rounded-lg border border-rose-200">
+                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
+                            <span className="text-lg font-black text-rose-800">{criticalCount} PÇ</span>
+                          </div>
                         </div>
                       </div>
                     );
                   })()}
 
-                  {/* Comparison Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
-                      <thead>
-                        <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
-                          <th className="px-3 py-2.5 w-16">Kod</th>
-                          <th className="px-3 py-2.5 min-w-[200px]">PÇ Tanımı</th>
-                          <th className="px-3 py-2.5 text-center w-24">Alt Sınır</th>
-                          <th className="px-3 py-2.5 text-center w-24">Hedef</th>
-                          <th className="px-3 py-2.5 text-center w-32">Gerçekleşen Başarı</th>
-                          <th className="px-3 py-2.5 text-center w-24">Sapma / Fark</th>
-                          <th className="px-3 py-2.5 text-center w-36">Durum Değerlendirmesi</th>
-                          <th className="px-3 py-2.5 min-w-[150px]">Dayanak / Kanıt</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {programReportData.pcs.map((pc, i) => {
-                          const val = programReportData.finalPcData[i] || 0;
-                          const minTh = pc.min_threshold ?? 50;
-                          const target = pc.target_goal ?? 70;
-                          const delta = Number((val - target).toFixed(1));
-                          const isAchieved = val >= target;
-                          const isWarning = val >= minTh && val < target;
-                          const isCritical = val < minTh;
-                          const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+                  {/* Standard or Single Term Comparison Table */}
+                  {progCompareTerm !== 'MATRIX' ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
+                        <thead>
+                          <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
+                            <th className="px-3 py-2.5 w-16">Kod</th>
+                            <th className="px-3 py-2.5 min-w-[200px]">PÇ Tanımı</th>
+                            <th className="px-3 py-2.5 text-center w-24">Alt Sınır</th>
+                            <th className="px-3 py-2.5 text-center w-24">Hedef</th>
+                            <th className="px-3 py-2.5 text-center w-32">
+                              {progCompareTerm === 'ALL' ? 'Genel Başarı' : 'Dönem Başarısı'}
+                            </th>
+                            <th className="px-3 py-2.5 text-center w-24">Sapma / Fark</th>
+                            <th className="px-3 py-2.5 text-center w-36">Durum Değerlendirmesi</th>
+                            <th className="px-3 py-2.5 min-w-[150px]">Dayanak / Kanıt</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {programReportData.pcs.map((pc, i) => {
+                            let val = 0;
+                            if (progCompareTerm === 'ALL') {
+                              val = programReportData.finalPcData[i] || 0;
+                            } else {
+                              const ts = programReportData.termSummaryMap[progCompareTerm]?.[pc.code];
+                              val = ts && ts.wAkts > 0 ? Number((ts.wSum / ts.wAkts).toFixed(1)) : 0;
+                            }
 
-                          return (
-                            <tr key={pc.id} className={`hover:bg-slate-100/50 ${bg}`}>
-                              <td className="px-3 py-2.5 font-bold text-primary whitespace-nowrap">
-                                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-black">{pc.code}</span>
-                              </td>
-                              <td className="px-3 py-2.5 text-slate-700 font-medium leading-relaxed">
-                                {pc.description || '—'}
-                              </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-slate-600 whitespace-nowrap">
-                                %{minTh}
-                              </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-slate-800 whitespace-nowrap">
-                                %{target}
-                              </td>
-                              <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                <div className="flex flex-col items-center gap-1">
-                                  <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
-                                    %{val}
-                                  </span>
-                                  {/* Mini visual bar */}
-                                  <div className="w-20 bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
-                                      style={{ width: `${Math.min(val, 100)}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2.5 text-center font-bold whitespace-nowrap">
-                                {delta >= 0 ? (
-                                  <span className="text-emerald-700 font-bold">+{delta}%</span>
-                                ) : (
-                                  <span className="text-rose-700 font-bold">{delta}%</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                {isAchieved && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                    Hedefe Ulaşıldı
-                                  </span>
-                                )}
-                                {isWarning && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                                    <span className="material-symbols-outlined text-[13px]">warning</span>
-                                    Eşik Üstü / Geliştirilmeli
-                                  </span>
-                                )}
-                                {isCritical && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                                    <span className="material-symbols-outlined text-[13px]">error</span>
-                                    Alt Sınır Altında
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                {pc.evidence ? (
-                                  <div className="relative group/tooltip inline-block max-w-[180px]">
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-900 border border-amber-200/80 cursor-help hover:bg-amber-100/70">
-                                      <span className="material-symbols-outlined text-[13px] text-amber-700 flex-shrink-0">gavel</span>
-                                      <span className="truncate">{pc.evidence}</span>
+                            const minTh = pc.min_threshold ?? 50;
+                            const target = pc.target_goal ?? 70;
+                            const delta = Number((val - target).toFixed(1));
+                            const isAchieved = val >= target;
+                            const isWarning = val >= minTh && val < target;
+                            const isCritical = val < minTh;
+                            const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+
+                            return (
+                              <tr key={pc.id} className={`hover:bg-slate-100/50 ${bg}`}>
+                                <td className="px-3 py-2.5 font-bold text-primary whitespace-nowrap">
+                                  <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-black">{pc.code}</span>
+                                </td>
+                                <td className="px-3 py-2.5 text-slate-700 font-medium leading-relaxed">
+                                  {pc.description || '—'}
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-bold text-slate-600 whitespace-nowrap">
+                                  %{minTh}
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-bold text-slate-800 whitespace-nowrap">
+                                  %{target}
+                                </td>
+                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
+                                      %{val}
+                                    </span>
+                                    <div className="w-20 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                      <div 
+                                        className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
+                                        style={{ width: `${Math.min(val, 100)}%` }}
+                                      />
                                     </div>
-                                    {/* Hover Tooltip */}
-                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 w-64 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-700 animate-fade-in pointer-events-none">
-                                      <div className="font-bold text-amber-300 flex items-center gap-1 mb-1">
-                                        <span className="material-symbols-outlined text-xs">verified</span>
-                                        Dayanak Kurul Kararı
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-center font-bold whitespace-nowrap">
+                                  {delta >= 0 ? (
+                                    <span className="text-emerald-700 font-bold">+{delta}%</span>
+                                  ) : (
+                                    <span className="text-rose-700 font-bold">{delta}%</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                  {isAchieved && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                      Hedefe Ulaşıldı
+                                    </span>
+                                  )}
+                                  {isWarning && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                      <span className="material-symbols-outlined text-[13px]">warning</span>
+                                      Eşik Üstü / Geliştirilmeli
+                                    </span>
+                                  )}
+                                  {isCritical && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                      <span className="material-symbols-outlined text-[13px]">error</span>
+                                      Alt Sınır Altında
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {pc.evidence ? (
+                                    <div className="relative group/tooltip inline-block max-w-[180px]">
+                                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-900 border border-amber-200/80 cursor-help hover:bg-amber-100/70">
+                                        <span className="material-symbols-outlined text-[13px] text-amber-700 flex-shrink-0">gavel</span>
+                                        <span className="truncate">{pc.evidence}</span>
                                       </div>
-                                      <p className="leading-relaxed text-slate-200 break-words font-normal">
-                                        {pc.evidence}
-                                      </p>
-                                      <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700 transform rotate-45 absolute -bottom-1 left-4"></div>
+                                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 w-64 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-700 animate-fade-in pointer-events-none">
+                                        <div className="font-bold text-amber-300 flex items-center gap-1 mb-1">
+                                          <span className="material-symbols-outlined text-xs">verified</span>
+                                          Dayanak Kurul Kararı
+                                        </div>
+                                        <p className="leading-relaxed text-slate-200 break-words font-normal">
+                                          {pc.evidence}
+                                        </p>
+                                        <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700 transform rotate-45 absolute -bottom-1 left-4"></div>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] text-slate-400 italic">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    /* Multi-Term Matrix Comparison View */
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-[11px] min-w-[800px]">
+                        <thead>
+                          <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
+                            <th className="px-3 py-2.5 w-16">Kod</th>
+                            <th className="px-3 py-2.5 min-w-[180px]">PÇ Tanımı</th>
+                            <th className="px-2 py-2.5 text-center w-20">Alt Sınır</th>
+                            <th className="px-2 py-2.5 text-center w-20">Hedef</th>
+                            {programReportData.selectedTerms.map(term => (
+                              <th key={term.id} className="px-3 py-2.5 text-center min-w-[110px] bg-slate-800 text-amber-200">
+                                📅 {term.name}
+                              </th>
+                            ))}
+                            <th className="px-3 py-2.5 text-center w-28 bg-primary-container text-white">Genel Ortalama</th>
+                            <th className="px-3 py-2.5 text-center w-24">Genel Sapma</th>
+                            <th className="px-3 py-2.5 text-center w-36">Genel Durum</th>
+                            <th className="px-3 py-2.5 min-w-[140px]">Dayanak / Kanıt</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {programReportData.pcs.map((pc, i) => {
+                            const generalVal = programReportData.finalPcData[i] || 0;
+                            const minTh = pc.min_threshold ?? 50;
+                            const target = pc.target_goal ?? 70;
+                            const generalDelta = Number((generalVal - target).toFixed(1));
+                            const isAchieved = generalVal >= target;
+                            const isWarning = generalVal >= minTh && generalVal < target;
+                            const isCritical = generalVal < minTh;
+                            const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+
+                            return (
+                              <tr key={pc.id} className={`hover:bg-slate-100/50 ${bg}`}>
+                                <td className="px-3 py-2.5 font-bold text-primary whitespace-nowrap">
+                                  <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-black">{pc.code}</span>
+                                </td>
+                                <td className="px-3 py-2.5 text-slate-700 font-medium leading-relaxed">
+                                  {pc.description || '—'}
+                                </td>
+                                <td className="px-2 py-2.5 text-center font-bold text-slate-600 whitespace-nowrap">
+                                  %{minTh}
+                                </td>
+                                <td className="px-2 py-2.5 text-center font-bold text-slate-800 whitespace-nowrap">
+                                  %{target}
+                                </td>
+
+                                {/* Per Term Score Columns */}
+                                {programReportData.selectedTerms.map(term => {
+                                  const ts = programReportData.termSummaryMap[term.id]?.[pc.code];
+                                  const termScore = ts && ts.wAkts > 0 ? Number((ts.wSum / ts.wAkts).toFixed(1)) : null;
+
+                                  if (termScore === null) {
+                                    return <td key={term.id} className="px-3 py-2.5 text-center text-slate-300 font-normal">—</td>;
+                                  }
+
+                                  return (
+                                    <td key={term.id} className="px-3 py-2.5 text-center whitespace-nowrap">
+                                      <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(termScore)}`}>
+                                        %{termScore}
+                                      </span>
+                                    </td>
+                                  );
+                                })}
+
+                                {/* General Score */}
+                                <td className="px-3 py-2.5 text-center whitespace-nowrap bg-primary/5">
+                                  <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(generalVal)}`}>
+                                    %{generalVal}
+                                  </span>
+                                </td>
+
+                                {/* General Delta */}
+                                <td className="px-3 py-2.5 text-center font-bold whitespace-nowrap">
+                                  {generalDelta >= 0 ? (
+                                    <span className="text-emerald-700 font-bold">+{generalDelta}%</span>
+                                  ) : (
+                                    <span className="text-rose-700 font-bold">{generalDelta}%</span>
+                                  )}
+                                </td>
+
+                                {/* General Status */}
+                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                  {isAchieved && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                      Hedefe Ulaşıldı
+                                    </span>
+                                  )}
+                                  {isWarning && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                      <span className="material-symbols-outlined text-[13px]">warning</span>
+                                      Eşik Üstü
+                                    </span>
+                                  )}
+                                  {isCritical && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                      <span className="material-symbols-outlined text-[13px]">error</span>
+                                      Alt Sınır Altı
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Evidence */}
+                                <td className="px-3 py-2.5">
+                                  {pc.evidence ? (
+                                    <div className="relative group/tooltip inline-block max-w-[160px]">
+                                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-900 border border-amber-200/80 cursor-help hover:bg-amber-100/70">
+                                        <span className="material-symbols-outlined text-[13px] text-amber-700 flex-shrink-0">gavel</span>
+                                        <span className="truncate">{pc.evidence}</span>
+                                      </div>
+                                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 w-64 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-700 animate-fade-in pointer-events-none">
+                                        <div className="font-bold text-amber-300 flex items-center gap-1 mb-1">
+                                          <span className="material-symbols-outlined text-xs">verified</span>
+                                          Dayanak Kurul Kararı
+                                        </div>
+                                        <p className="leading-relaxed text-slate-200 break-words font-normal">
+                                          {pc.evidence}
+                                        </p>
+                                        <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700 transform rotate-45 absolute -bottom-1 left-4"></div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 {/* Page Footer */}
