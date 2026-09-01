@@ -3,6 +3,77 @@ import * as XLSX from 'xlsx';
 import pb from '../../lib/pocketbase';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
 
+const parseDate = (dateVal) => {
+  if (!dateVal) return null;
+  const d = new Date(dateVal);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const formatRelativeTime = (isoDate) => {
+  const d = parseDate(isoDate);
+  if (!d) return '';
+  const now = new Date();
+  const diffSec = Math.floor((now - d) / 1000);
+  if (diffSec < 60) return 'Az önce';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} sa önce`;
+  return d.toLocaleDateString('tr-TR');
+};
+
+const roleLabel = (role) => {
+  switch (role) {
+    case 'admin': return 'Sistem Yöneticisi';
+    case 'coordinator': return 'Bölüm/Program Başkanı';
+    case 'program_head': return 'Bölüm/Program Başkanı';
+    case 'instructor': return 'Öğretim Elemanı';
+    default: return role || 'Kullanıcı';
+  }
+};
+
+const roleBadgeStyle = (role) => {
+  switch (role) {
+    case 'admin': return 'bg-purple-100 text-purple-800 border-purple-200';
+    case 'coordinator':
+    case 'program_head': return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'instructor': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    default: return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
+};
+
+const actionBadge = (action) => {
+  switch (action) {
+    case 'CREATE':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none"><span className="material-symbols-outlined text-[13px]">add_circle</span>EKLEME</span>;
+    case 'UPDATE':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 leading-none"><span className="material-symbols-outlined text-[13px]">edit</span>GÜNCELLEME</span>;
+    case 'DELETE':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 leading-none"><span className="material-symbols-outlined text-[13px]">delete</span>SİLME</span>;
+    case 'IMPORT':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 leading-none"><span className="material-symbols-outlined text-[13px]">upload_file</span>İÇE AKTARMA</span>;
+    case 'EXPORT':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 leading-none"><span className="material-symbols-outlined text-[13px]">download</span>DIŞA AKTARMA</span>;
+    case 'LOGIN':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 leading-none"><span className="material-symbols-outlined text-[13px]">login</span>GİRİŞ</span>;
+    default:
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 leading-none">{action}</span>;
+  }
+};
+
+const categoryIcon = (cat) => {
+  switch (cat) {
+    case 'Kullanıcı': return 'person';
+    case 'Fakülte/Bölüm': return 'domain';
+    case 'Dönem': return 'calendar_month';
+    case 'Ders': return 'menu_book';
+    case 'PÇ/DÇ': return 'target';
+    case 'Matris': return 'grid_on';
+    case 'Sınav': return 'assignment';
+    case 'Not': return 'grade';
+    case 'Öğrenci': return 'group';
+    default: return 'info';
+  }
+};
+
 export default function AdminLogs() {
   const { alert, confirm } = useAlertConfirm();
   const [logs, setLogs] = useState([]);
@@ -168,77 +239,6 @@ export default function AdminLogs() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const roleLabel = (role) => {
-    switch (role) {
-      case 'admin': return 'Sistem Yöneticisi';
-      case 'coordinator': return 'Bölüm/Program Başkanı';
-      case 'program_head': return 'Bölüm/Program Başkanı';
-      case 'instructor': return 'Öğretim Elemanı';
-      default: return role || 'Kullanıcı';
-    }
-  };
-
-  const roleBadgeStyle = (role) => {
-    switch (role) {
-      case 'admin': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'coordinator':
-      case 'program_head': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'instructor': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      default: return 'bg-slate-100 text-slate-700 border-slate-200';
-    }
-  };
-
-  const actionBadge = (action) => {
-    switch (action) {
-      case 'CREATE':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 leading-none"><span className="material-symbols-outlined text-[13px]">add_circle</span>EKLEME</span>;
-      case 'UPDATE':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 leading-none"><span className="material-symbols-outlined text-[13px]">edit</span>GÜNCELLEME</span>;
-      case 'DELETE':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 leading-none"><span className="material-symbols-outlined text-[13px]">delete</span>SİLME</span>;
-      case 'IMPORT':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 leading-none"><span className="material-symbols-outlined text-[13px]">upload_file</span>İÇE AKTARMA</span>;
-      case 'EXPORT':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 leading-none"><span className="material-symbols-outlined text-[13px]">download</span>DIŞA AKTARMA</span>;
-      case 'LOGIN':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 leading-none"><span className="material-symbols-outlined text-[13px]">login</span>GİRİŞ</span>;
-      default:
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 leading-none">{action}</span>;
-    }
-  };
-
-  const categoryIcon = (cat) => {
-    switch (cat) {
-      case 'Kullanıcı': return 'person';
-      case 'Fakülte/Bölüm': return 'domain';
-      case 'Dönem': return 'calendar_month';
-      case 'Ders': return 'menu_book';
-      case 'PÇ/DÇ': return 'target';
-      case 'Matris': return 'grid_on';
-      case 'Sınav': return 'assignment';
-      case 'Not': return 'grade';
-      case 'Öğrenci': return 'group';
-      default: return 'info';
-    }
-  };
-
-  const parseDate = (dateVal) => {
-    if (!dateVal) return null;
-    const d = new Date(dateVal);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
-  const formatRelativeTime = (isoDate) => {
-    const d = parseDate(isoDate);
-    if (!d) return '';
-    const now = new Date();
-    const diffSec = Math.floor((now - d) / 1000);
-    if (diffSec < 60) return 'Az önce';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} sa önce`;
-    return d.toLocaleDateString('tr-TR');
   };
 
   const totalPages = Math.ceil(totalItems / perPage) || 1;
