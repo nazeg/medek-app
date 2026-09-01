@@ -51,10 +51,14 @@ export default function AdminLogs() {
         filterConditions.push(`(user_name ~ "${s}" || details ~ "${s}" || category ~ "${s}" || action ~ "${s}")`);
       }
 
-      const res = await pb.collection('logs').getList(page, perPage, {
+      const queryOptions = {
         sort: '-created',
-        filter: filterConditions.length > 0 ? filterConditions.join(' && ') : '',
-      }).catch(err => {
+      };
+      if (filterConditions.length > 0) {
+        queryOptions.filter = filterConditions.join(' && ');
+      }
+
+      const res = await pb.collection('logs').getList(page, perPage, queryOptions).catch(err => {
         console.warn('Logs query fallback:', err);
         return { items: [], totalItems: 0 };
       });
