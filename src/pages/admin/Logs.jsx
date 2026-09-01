@@ -222,9 +222,15 @@ export default function AdminLogs() {
     }
   };
 
+  const parseDate = (dateVal) => {
+    if (!dateVal) return null;
+    const d = new Date(dateVal);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const formatRelativeTime = (isoDate) => {
-    if (!isoDate) return '—';
-    const d = new Date(isoDate);
+    const d = parseDate(isoDate);
+    if (!d) return '';
     const now = new Date();
     const diffSec = Math.floor((now - d) / 1000);
     if (diffSec < 60) return 'Az önce';
@@ -437,16 +443,16 @@ export default function AdminLogs() {
                 </tr>
               ) : (
                 logs.map((log) => {
-                  const dateObj = new Date(log.created);
-                  const dateStr = dateObj.toLocaleDateString('tr-TR');
-                  const timeStr = dateObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                  const dateObj = parseDate(log.created) || parseDate(log.updated);
+                  const dateStr = dateObj ? dateObj.toLocaleDateString('tr-TR') : '—';
+                  const timeStr = dateObj ? dateObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
 
                   return (
                     <tr key={log.id} className="hover:bg-slate-50/60 transition-colors group">
                       {/* Date & Time */}
                       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                         <div className="font-bold text-slate-800">{dateStr} {timeStr}</div>
-                        <div className="text-[10px] text-slate-400 font-medium">{formatRelativeTime(log.created)}</div>
+                        {dateObj && <div className="text-[10px] text-slate-400 font-medium">{formatRelativeTime(log.created || log.updated)}</div>}
                       </td>
 
                       {/* User & Role */}
