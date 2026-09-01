@@ -3291,7 +3291,6 @@ export default function InstructorReports() {
                   <span className="pdf-footer-page-num">Sayfa 3</span>
                 </div>
               </div>
-              </div>
 
             </div>
           ) : (
