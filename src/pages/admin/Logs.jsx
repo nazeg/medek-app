@@ -58,10 +58,20 @@ export default function AdminLogs() {
         queryOptions.filter = filterConditions.join(' && ');
       }
 
-      const res = await pb.collection('logs').getList(page, perPage, queryOptions).catch(err => {
-        console.warn('Logs query fallback:', err);
-        return { items: [], totalItems: 0 };
-      });
+      let res;
+      try {
+        res = await pb.collection('logs').getList(page, perPage, queryOptions);
+      } catch (e1) {
+        // Fallback without sort if created field is still migrating
+        try {
+          const fallbackOptions = { ...queryOptions };
+          delete fallbackOptions.sort;
+          res = await pb.collection('logs').getList(page, perPage, fallbackOptions);
+        } catch (e2) {
+          console.warn('Logs query error:', e2);
+          res = { items: [], totalItems: 0 };
+        }
+      }
 
       setLogs(res.items || []);
       setTotalItems(res.totalItems || 0);
