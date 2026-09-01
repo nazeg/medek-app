@@ -3416,84 +3416,110 @@ export default function InstructorReports() {
                       </div>
                     </div>
 
-                    {/* Web View Save Action */}
-                    <div className="pdf-hide flex items-center gap-2">
-                      {opinionSaved && (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 animate-fade-in">
-                          <span className="material-symbols-outlined text-sm">check_circle</span>
-                          Kaydedildi
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleSaveHeadOpinion}
-                        disabled={savingOpinion}
-                        className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold shadow-sm hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {savingOpinion ? (
-                          <>
-                            <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
-                            Kaydediliyor...
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-sm">save</span>
-                            Görüşü Kaydet
-                          </>
+                    {/* Web View Save Action (Only for Program Head, Coordinator, Admin) */}
+                    {user && (user.role === 'program_head' || user.role === 'admin' || user.role === 'coordinator') && (
+                      <div className="pdf-hide flex items-center gap-2">
+                        {opinionSaved && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 animate-fade-in">
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            Kaydedildi
+                          </span>
                         )}
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={handleSaveHeadOpinion}
+                          disabled={savingOpinion}
+                          className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold shadow-sm hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {savingOpinion ? (
+                            <>
+                              <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                              Kaydediliyor...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-sm">save</span>
+                              Görüşü Kaydet
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Web Interactive Editor */}
-                  <div className="pdf-hide bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                    <textarea
-                      value={headOpinion}
-                      onChange={e => setHeadOpinion(e.target.value)}
-                      rows={4}
-                      className="w-full bg-white border border-outline-variant rounded-lg p-3 text-xs leading-relaxed text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400 font-normal"
-                      placeholder="Program çıktılarının gerçekleşme oranları ve hedeften sapmalar değerlendirildiğinde; hedeflenen başarıya ulaşan çıktılar ve iyileştirilmesi gereken hususlar hakkında kurul/bölüm görüşü..."
-                    />
+                  {/* Web Interactive Editor (If Authorized) */}
+                  {user && (user.role === 'program_head' || user.role === 'admin' || user.role === 'coordinator') ? (
+                    <div className="pdf-hide bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      <textarea
+                        value={headOpinion}
+                        onChange={e => setHeadOpinion(e.target.value)}
+                        rows={4}
+                        className="w-full bg-white border border-outline-variant rounded-lg p-3 text-xs leading-relaxed text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400 font-normal"
+                        placeholder="Program çıktılarının gerçekleşme oranları ve hedeften sapmalar değerlendirildiğinde; hedeflenen başarıya ulaşan çıktılar ve iyileştirilmesi gereken hususlar hakkında kurul/bölüm görüşü..."
+                      />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                          Değerlendiren (Adı Soyadı)
-                        </label>
-                        <input
-                          type="text"
-                          value={evaluatorName}
-                          onChange={e => setEvaluatorName(e.target.value)}
-                          placeholder="Örn: Prof. Dr. Ahmet Yılmaz"
-                          className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                          Görevi / Unvanı
-                        </label>
-                        <input
-                          type="text"
-                          value={evaluatorTitle}
-                          onChange={e => setEvaluatorTitle(e.target.value)}
-                          placeholder="Bölüm Başkanı / Program Sorumlusu"
-                          className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                          Değerlendirme Tarihi
-                        </label>
-                        <input
-                          type="text"
-                          value={evaluatorDate}
-                          onChange={e => setEvaluatorDate(e.target.value)}
-                          placeholder={new Date().toLocaleDateString('tr-TR')}
-                          className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
-                        />
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                            Değerlendiren (Adı Soyadı)
+                          </label>
+                          <input
+                            type="text"
+                            value={evaluatorName}
+                            onChange={e => setEvaluatorName(e.target.value)}
+                            placeholder="Örn: Prof. Dr. Ahmet Yılmaz"
+                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                            Görevi / Unvanı
+                          </label>
+                          <input
+                            type="text"
+                            value={evaluatorTitle}
+                            onChange={e => setEvaluatorTitle(e.target.value)}
+                            placeholder="Bölüm Başkanı / Program Sorumlusu"
+                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                            Değerlendirme Tarihi
+                          </label>
+                          <input
+                            type="text"
+                            value={evaluatorDate}
+                            onChange={e => setEvaluatorDate(e.target.value)}
+                            placeholder={new Date().toLocaleDateString('tr-TR')}
+                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Read-Only View for Instructors */
+                    <div className="pdf-hide bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="text-xs text-slate-800 leading-relaxed min-h-[50px] whitespace-pre-wrap">
+                        {headOpinion ? (
+                          headOpinion
+                        ) : (
+                          <span className="italic text-slate-400">
+                            (Bu dönem ve sınıf kapsamı için Bölüm Başkanı değerlendirme görüşü henüz girilmemiştir.)
+                          </span>
+                        )}
+                      </div>
+                      {headOpinion && (
+                        <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-600 font-medium">
+                          <span>📅 Tarih: <b>{evaluatorDate}</b></span>
+                          <span>✍️ <b>{evaluatorName}</b> ({evaluatorTitle})</span>
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-400 italic">
+                        🔒 Bu değerlendirme alanı yalnızca Bölüm Başkanı / Program Sorumlusu tarafından düzenlenebilir.
+                      </div>
+                    </div>
+                  )}
 
                   {/* Formal Print & PDF View Layout */}
                   <div className="hidden pdf-show border border-slate-300 rounded-lg p-4 bg-slate-50/50 space-y-4">
