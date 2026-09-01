@@ -445,7 +445,7 @@ export default function AdminLogs() {
                 </tr>
               ) : (
                 logs.map((log) => {
-                  const dateObj = parseDate(log.created) || parseDate(log.updated);
+                  const dateObj = parseDate(log.created_at || log.created || log.updated);
                   const dateStr = dateObj ? dateObj.toLocaleDateString('tr-TR') : '—';
                   const timeStr = dateObj ? dateObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
 
@@ -454,7 +454,7 @@ export default function AdminLogs() {
                       {/* Date & Time */}
                       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                         <div className="font-bold text-slate-800">{dateStr} {timeStr}</div>
-                        {dateObj && <div className="text-[10px] text-slate-400 font-medium">{formatRelativeTime(log.created || log.updated)}</div>}
+                        {dateObj && <div className="text-[10px] text-slate-400 font-medium">{formatRelativeTime(log.created_at || log.created || log.updated)}</div>}
                       </td>
 
                       {/* User & Role */}
