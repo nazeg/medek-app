@@ -73,6 +73,15 @@ export default function InstructorReports() {
   const [opinionSaved, setOpinionSaved] = useState(false);
   const [opinionRecordId, setOpinionRecordId] = useState(null);
 
+  // Öğretim Elemanı Ders Değerlendirme Görüşü State
+  const [courseOpinion, setCourseOpinion] = useState('');
+  const [courseEvaluatorName, setCourseEvaluatorName] = useState('');
+  const [courseEvaluatorTitle, setCourseEvaluatorTitle] = useState('Dersi Veren Öğretim Elemanı');
+  const [courseEvaluatorDate, setCourseEvaluatorDate] = useState(new Date().toLocaleDateString('tr-TR'));
+  const [savingCourseOpinion, setSavingCourseOpinion] = useState(false);
+  const [courseOpinionSaved, setCourseOpinionSaved] = useState(false);
+  const [courseOpinionRecordId, setCourseOpinionRecordId] = useState(null);
+
   const printCourseRef = useRef(null);
   const printProgramRef = useRef(null);
 
@@ -647,6 +656,71 @@ export default function InstructorReports() {
       const mediumQuestions = questionStats.filter(s => s.success >= 20 && s.success < 80);
       const hardQuestions = questionStats.filter(s => s.success < 20);
 
+      // Determine default instructor name from course expand or user
+      const courseInstructors = selectedCourse.expand?.instructor;
+      let defaultInstName = '';
+      let defaultInstTitle = 'Dersi Veren Öğretim Elemanı';
+      if (Array.isArray(courseInstructors) && courseInstructors.length > 0) {
+        defaultInstName = courseInstructors.map(i => i.title ? `${i.title} ${i.name}` : i.name).join(', ');
+      } else if (courseInstructors?.name) {
+        defaultInstName = courseInstructors.title ? `${courseInstructors.title} ${courseInstructors.name}` : courseInstructors.name;
+      } else if (user?.name) {
+        defaultInstName = user.title ? `${user.title} ${user.name}` : user.name;
+      }
+
+      // Load Course Instructor Evaluation (Offline Cache + Server)
+      const termId = activeTerm?.id || 'all';
+      const courseLocalCacheKey = `medek_course_opinion_${selectedCourse.id}_${termId}_${displayModName}`;
+      let cachedCourseData = null;
+      try {
+        const raw = localStorage.getItem(courseLocalCacheKey);
+        if (raw) cachedCourseData = JSON.parse(raw);
+      } catch (e) {}
+
+      let courseOpinionFound = false;
+      try {
+        const cEvals = await pb.collection('course_evaluations').getFullList({
+          sort: '-created',
+          filter: `course = "${selectedCourse.id}" && mod_name = "${displayModName}" ${activeTerm?.id ? `&& term = "${activeTerm.id}"` : ''}`
+        });
+        if (cEvals && cEvals.length > 0) {
+          const ev = cEvals[0];
+          setCourseOpinionRecordId(ev.id);
+          setCourseOpinion(ev.opinion || '');
+          setCourseEvaluatorName(ev.evaluator_name || defaultInstName);
+          setCourseEvaluatorTitle(ev.evaluator_title || defaultInstTitle);
+          setCourseEvaluatorDate(ev.evaluator_date || new Date().toLocaleDateString('tr-TR'));
+          courseOpinionFound = true;
+          try {
+            localStorage.setItem(courseLocalCacheKey, JSON.stringify({
+              id: ev.id,
+              opinion: ev.opinion || '',
+              evaluator_name: ev.evaluator_name || defaultInstName,
+              evaluator_title: ev.evaluator_title || defaultInstTitle,
+              evaluator_date: ev.evaluator_date || new Date().toLocaleDateString('tr-TR'),
+            }));
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn('Server query for course evaluation:', e);
+      }
+
+      if (!courseOpinionFound) {
+        if (cachedCourseData) {
+          setCourseOpinionRecordId(cachedCourseData.id || null);
+          setCourseOpinion(cachedCourseData.opinion || '');
+          setCourseEvaluatorName(cachedCourseData.evaluator_name || defaultInstName);
+          setCourseEvaluatorTitle(cachedCourseData.evaluator_title || defaultInstTitle);
+          setCourseEvaluatorDate(cachedCourseData.evaluator_date || new Date().toLocaleDateString('tr-TR'));
+        } else {
+          setCourseOpinionRecordId(null);
+          setCourseOpinion('');
+          setCourseEvaluatorName(defaultInstName);
+          setCourseEvaluatorTitle(defaultInstTitle);
+          setCourseEvaluatorDate(new Date().toLocaleDateString('tr-TR'));
+        }
+      }
+
       setAnalizData({
         modName: displayModName,
         pcs,
@@ -1145,6 +1219,54 @@ export default function InstructorReports() {
       alert('Rapor hesaplanırken hata oluştu.', 'Hata', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Save Course Instructor Opinion Handler
+  const handleSaveCourseOpinion = async () => {
+    if (!selectedCourse || !analizData) return;
+    setSavingCourseOpinion(true);
+    const termId = activeTerm?.id || 'all';
+    const displayModName = analizData.modName;
+    const courseLocalCacheKey = `medek_course_opinion_${selectedCourse.id}_${termId}_${displayModName}`;
+
+    const payload = {
+      course: selectedCourse.id,
+      term: activeTerm?.id || '',
+      mod_name: displayModName,
+      opinion: courseOpinion.trim(),
+      evaluator_name: courseEvaluatorName.trim(),
+      evaluator_title: courseEvaluatorTitle.trim(),
+      evaluator_date: courseEvaluatorDate.trim(),
+    };
+
+    try {
+      localStorage.setItem(courseLocalCacheKey, JSON.stringify(payload));
+    } catch (e) {}
+
+    try {
+      if (courseOpinionRecordId) {
+        await pb.collection('course_evaluations').update(courseOpinionRecordId, payload);
+      } else {
+        const res = await pb.collection('course_evaluations').create(payload);
+        setCourseOpinionRecordId(res.id);
+      }
+      setCourseOpinionSaved(true);
+      setTimeout(() => setCourseOpinionSaved(false), 3000);
+      try {
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.SYSTEM,
+          details: `"${selectedCourse.code} - ${selectedCourse.name}" dersi (${displayModName}) için Öğretim Elemanı Değerlendirme Görüşü kaydedildi.`,
+          metadata: payload
+        });
+      } catch (e) {}
+    } catch (err) {
+      console.warn('Error saving course opinion to server, saved locally:', err);
+      setCourseOpinionSaved(true);
+      setTimeout(() => setCourseOpinionSaved(false), 3000);
+    } finally {
+      setSavingCourseOpinion(false);
     }
   };
 
@@ -2226,6 +2348,131 @@ export default function InstructorReports() {
                       </div>
                     );
                   })()}
+
+                  {/* ========================================================
+                      DERSİ VEREN ÖĞRETİM ELEMANI DEĞERLENDİRME VE İYİLEŞTİRME GÖRÜŞÜ
+                     ======================================================== */}
+                  <div className="pt-4 border-t border-slate-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                          <span className="material-symbols-outlined text-primary text-lg">rate_review</span>
+                          ✍️ Dersi Veren Öğretim Elemanı Değerlendirme & İyileştirme Görüşü
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
+                          <span className="text-[11px] font-semibold text-slate-500">Değerlendirilen Kapsam:</span>
+                          <span className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold">
+                            <span>{selectedCourse.code} — {selectedCourse.name}</span>
+                            {selectedCourse.sube && <span>(Şube: {selectedCourse.sube})</span>}
+                            <span>• {analizData.modName}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Web View Save Action */}
+                      <div className="pdf-hide flex items-center gap-2">
+                        {courseOpinionSaved && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 animate-fade-in">
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            Kaydedildi
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleSaveCourseOpinion}
+                          disabled={savingCourseOpinion}
+                          className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold shadow-sm hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {savingCourseOpinion ? (
+                            <>
+                              <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                              Kaydediliyor...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-sm">save</span>
+                              Görüşü Kaydet
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Interactive Editor (pdf-hide) */}
+                    <div className="pdf-hide bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      <textarea
+                        value={courseOpinion}
+                        onChange={e => setCourseOpinion(e.target.value)}
+                        rows={4}
+                        className="w-full bg-white border border-outline-variant rounded-lg p-3 text-xs leading-relaxed text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400 font-normal"
+                        placeholder="Ders çıktılarının gerçekleşme oranları ve hedeften sapmalar değerlendirildiğinde; hedeflenen başarıya ulaşan çıktılar, ulaşılamayan çıktılar için sonraki dönemde alınacak tedbirler ve sürekli iyileştirme hususları hakkında ders sorumlusu görüşü..."
+                      />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                            Öğretim Elemanı (Adı Soyadı)
+                          </label>
+                          <input
+                            type="text"
+                            value={courseEvaluatorName}
+                            onChange={e => setCourseEvaluatorName(e.target.value)}
+                            placeholder="Örn: Dr. Öğr. Üyesi Ahmet Yılmaz"
+                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                            Görevi / Unvanı
+                          </label>
+                          <input
+                            type="text"
+                            value={courseEvaluatorTitle}
+                            onChange={e => setCourseEvaluatorTitle(e.target.value)}
+                            placeholder="Ders Sorumlusu / Öğretim Elemanı"
+                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                            Değerlendirme Tarihi
+                          </label>
+                          <input
+                            type="text"
+                            value={courseEvaluatorDate}
+                            onChange={e => setCourseEvaluatorDate(e.target.value)}
+                            placeholder={new Date().toLocaleDateString('tr-TR')}
+                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Formal Print & PDF View Layout (pdf-show) */}
+                    <div className="hidden pdf-show border border-slate-300 rounded-lg p-4 bg-slate-50/50 space-y-4">
+                      <div className="text-xs text-slate-800 leading-relaxed min-h-[60px] whitespace-pre-wrap">
+                        {courseOpinion ? courseOpinion : (
+                          <span className="italic text-slate-400">
+                            (Ders çıktıları değerlendirme ve sürekli iyileştirme görüşü henüz girilmemiştir.)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-end pt-3 border-t border-slate-200 text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Değerlendirme Tarihi</span>
+                          <span className="font-bold text-slate-700">{courseEvaluatorDate || new Date().toLocaleDateString('tr-TR')}</span>
+                        </div>
+                        <div className="text-right min-w-[200px] space-y-1">
+                          <div className="font-bold text-slate-900">{courseEvaluatorName || 'Ders Sorumlusu'}</div>
+                          <div className="text-[10px] font-semibold text-slate-500">{courseEvaluatorTitle || 'Öğretim Elemanı'}</div>
+                          <div className="pt-4 text-[10px] text-slate-400 font-medium border-b border-dashed border-slate-400 pb-1">
+                            İmza: _______________________
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Page Footer */}
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
