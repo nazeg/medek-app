@@ -1199,61 +1199,6 @@ export default function InstructorReports() {
         }
       }
 
-      // Calculate Measurement Intensity (Ölçme Yoğunluğu) for each PC
-      const totalEvaluatedCourses = coursePcRows.length;
-      const pcIntensity = pcs.map((pc, idx) => {
-        const assessingCourses = [];
-        coursePcRows.forEach(row => {
-          const score = row.pcScores[pc.code];
-          if (score !== null && score !== undefined) {
-            assessingCourses.push({
-              id: row.course.id,
-              code: row.course.code,
-              name: row.course.name,
-              sinif: row.course.sinif,
-              sube: row.course.sube,
-              termName: row.term.name,
-              akts: row.akts,
-              score: Number(score.toFixed(1))
-            });
-          }
-        });
-
-        const courseCount = assessingCourses.length;
-        const ratio = totalEvaluatedCourses > 0 ? Number(((courseCount / totalEvaluatedCourses) * 100).toFixed(1)) : 0;
-
-        let status = 'none';
-        let statusLabel = 'Ölçülmedi';
-        let badgeBg = 'bg-rose-100 text-rose-800 border-rose-200';
-
-        if (courseCount >= 4) {
-          status = 'high';
-          statusLabel = 'Yüksek Yoğunluk';
-          badgeBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-        } else if (courseCount >= 2) {
-          status = 'medium';
-          statusLabel = 'Yeterli Yoğunluk';
-          badgeBg = 'bg-blue-100 text-blue-800 border-blue-200';
-        } else if (courseCount === 1) {
-          status = 'low';
-          statusLabel = 'Düşük (Tek Ders Riski)';
-          badgeBg = 'bg-amber-100 text-amber-900 border-amber-200';
-        }
-
-        return {
-          id: pc.id,
-          code: pc.code,
-          description: pc.description,
-          generalScore: finalPcData[idx] || 0,
-          assessingCourses,
-          courseCount,
-          ratio,
-          status,
-          statusLabel,
-          badgeBg
-        };
-      });
-
       setProgramReportData({
         pcs,
         cohortKey,
@@ -1263,9 +1208,7 @@ export default function InstructorReports() {
         coursePcRows,
         termSummaryMap,
         finalPcData,
-        pcAggregate,
-        pcIntensity,
-        totalEvaluatedCourses
+        pcAggregate
       });
 
     } catch (err) {
@@ -1376,101 +1319,19 @@ export default function InstructorReports() {
     if (!programReportData) return;
 
     let chartProgPCInstance = null;
-    let chartProgIntensityInstance = null;
     const ctx = document.getElementById('chartProgPC');
-    if (ctx) {
-      if (progPcChartType === 'bar') {
-        chartProgPCInstance = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels: programReportData.pcs.map(p => p.code),
-            datasets: [{
-              label: '% Başarı',
-              data: programReportData.finalPcData,
-              backgroundColor: programReportData.finalPcData.map(v => v >= 70 ? '#006c49' : v >= 50 ? '#ffb95f' : '#ba1a1a'),
-              borderRadius: 6
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              datalabels: {
-                anchor: 'end',
-                align: 'top',
-                formatter: v => '%' + (Number(v) || 0).toFixed(2).replace('.', ','),
-                font: { weight: 'bold', size: 12 },
-                color: '#0b1c30'
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                  callback: v => '%' + v
-                }
-              },
-              x: {
-                grid: { display: false }
-              }
-            }
-          }
-        });
-      } else {
-        chartProgPCInstance = new Chart(ctx, {
-          type: 'radar',
-          data: {
-            labels: programReportData.pcs.map(p => p.code),
-            datasets: [{
-              label: '% Başarı',
-              data: programReportData.finalPcData,
-              borderColor: '#0058be',
-              backgroundColor: 'rgba(0, 88, 190, 0.15)',
-              fill: true,
-              pointBackgroundColor: '#0058be',
-              pointRadius: 4
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              datalabels: {
-                formatter: v => '%' + (Number(v) || 0).toFixed(2).replace('.', ','),
-                font: { weight: 'bold', size: 11 },
-                color: '#0058be',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                borderRadius: 4,
-                padding: { top: 2, bottom: 2, left: 4, right: 4 }
-              }
-            },
-            scales: {
-              r: { min: 0, max: 100 }
-            }
-          }
-        });
-      }
-    }
+    if (!ctx) return;
 
-    const ctxIntensity = document.getElementById('chartProgIntensity');
-    if (ctxIntensity && programReportData.pcIntensity) {
-      chartProgIntensityInstance = new Chart(ctxIntensity, {
+    if (progPcChartType === 'bar') {
+      chartProgPCInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: programReportData.pcIntensity.map(p => p.code),
+          labels: programReportData.pcs.map(p => p.code),
           datasets: [{
-            label: 'Ölçen Ders Sayısı',
-            data: programReportData.pcIntensity.map(p => p.courseCount),
-            backgroundColor: programReportData.pcIntensity.map(p => 
-              p.courseCount >= 4 ? '#006c49' :
-              p.courseCount >= 2 ? '#0058be' :
-              p.courseCount === 1 ? '#f59e0b' : '#ba1a1a'
-            ),
-            borderRadius: 6,
-            barPercentage: 0.55
+            label: '% Başarı',
+            data: programReportData.finalPcData,
+            backgroundColor: programReportData.finalPcData.map(v => v >= 70 ? '#006c49' : v >= 50 ? '#ffb95f' : '#ba1a1a'),
+            borderRadius: 6
           }]
         },
         options: {
@@ -1481,18 +1342,17 @@ export default function InstructorReports() {
             datalabels: {
               anchor: 'end',
               align: 'top',
-              formatter: v => v + ' Ders',
-              font: { weight: 'bold', size: 11 },
+              formatter: v => '%' + (Number(v) || 0).toFixed(2).replace('.', ','),
+              font: { weight: 'bold', size: 12 },
               color: '#0b1c30'
             }
           },
           scales: {
             y: {
               beginAtZero: true,
+              max: 100,
               ticks: {
-                stepSize: 1,
-                precision: 0,
-                callback: v => v + ' ders'
+                callback: v => '%' + v
               }
             },
             x: {
@@ -1501,11 +1361,44 @@ export default function InstructorReports() {
           }
         }
       });
+    } else {
+      chartProgPCInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: programReportData.pcs.map(p => p.code),
+          datasets: [{
+            label: '% Başarı',
+            data: programReportData.finalPcData,
+            borderColor: '#0058be',
+            backgroundColor: 'rgba(0, 88, 190, 0.15)',
+            fill: true,
+            pointBackgroundColor: '#0058be',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              formatter: v => '%' + (Number(v) || 0).toFixed(2).replace('.', ','),
+              font: { weight: 'bold', size: 11 },
+              color: '#0058be',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              borderRadius: 4,
+              padding: { top: 2, bottom: 2, left: 4, right: 4 }
+            }
+          },
+          scales: {
+            r: { min: 0, max: 100 }
+          }
+        }
+      });
     }
 
     return () => {
       if (chartProgPCInstance) chartProgPCInstance.destroy();
-      if (chartProgIntensityInstance) chartProgIntensityInstance.destroy();
     };
   }, [programReportData, progPcChartType]);
 
@@ -3775,226 +3668,7 @@ export default function InstructorReports() {
               </div>
 
               {/* ========================================================
-                  PAGE 3: PROGRAM ÇIKTILARI (PÇ) ÖLÇME YOĞUNLUĞU ANALİZİ
-                 ======================================================== */}
-              <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
-                {/* Sub Header */}
-                <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {selectedProgram.expand?.faculty?.name ? `• ${selectedProgram.expand.faculty.name}` : ''}</div>
-                    <span className="font-bold text-sm text-[#0058be]">{selectedProgram.name}</span>
-                  </div>
-                  <span className="text-xs text-slate-500 font-semibold">
-                    {programReportData.selectedTerms.map(t => t.name).join(' • ')}
-                  </span>
-                </div>
-
-                {/* Section Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-lg">density_medium</span>
-                      📊 Program Çıktıları (PÇ) Ölçme Yoğunluğu ve Müfredat Kapsam Analizi
-                    </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Müfredat genelinde her bir program çıktısının kaç farklı ders tarafından ölçüldüğünü, ölçme sıklığını ve akreditasyon güvence seviyesini gösterir.
-                    </p>
-                  </div>
-                </div>
-
-                {/* KPI Summary Cards */}
-                {(() => {
-                  const totalPcs = programReportData.pcs.length;
-                  const measuredPcs = programReportData.pcIntensity?.filter(p => p.courseCount > 0).length || 0;
-                  const coveragePct = totalPcs > 0 ? ((measuredPcs / totalPcs) * 100).toFixed(0) : 0;
-                  const totalLinks = programReportData.pcIntensity?.reduce((s, p) => s + p.courseCount, 0) || 0;
-                  const avgDensity = totalPcs > 0 ? (totalLinks / totalPcs).toFixed(1) : 0;
-                  const robustCount = programReportData.pcIntensity?.filter(p => p.courseCount >= 2).length || 0;
-                  const lowCount = programReportData.pcIntensity?.filter(p => p.courseCount <= 1).length || 0;
-
-                  return (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                      <div className="p-3 bg-gradient-to-br from-blue-50/60 to-white rounded-xl border border-blue-100 flex items-center gap-3 shadow-2xs">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-xl">fact_check</span>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Müfredat Kapsamı</div>
-                          <div className="text-base font-black text-blue-900">{measuredPcs} / {totalPcs} PÇ</div>
-                          <div className="text-[10px] font-semibold text-blue-700">%{coveragePct} Kapsama Oranı</div>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-gradient-to-br from-indigo-50/60 to-white rounded-xl border border-indigo-100 flex items-center gap-3 shadow-2xs">
-                        <div className="w-10 h-10 rounded-lg bg-indigo-100/70 text-indigo-700 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-xl">reorder</span>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ortalama Yoğunluk</div>
-                          <div className="text-base font-black text-indigo-900">{avgDensity} Ders / PÇ</div>
-                          <div className="text-[10px] font-semibold text-indigo-700">Toplam {totalLinks} Ders Ölçümü</div>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-gradient-to-br from-emerald-50/60 to-white rounded-xl border border-emerald-100 flex items-center gap-3 shadow-2xs">
-                        <div className="w-10 h-10 rounded-lg bg-emerald-100/70 text-emerald-700 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-xl">verified</span>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Güçlü Ölçüm (≥ 2 Ders)</div>
-                          <div className="text-base font-black text-emerald-900">{robustCount} PÇ</div>
-                          <div className="text-[10px] font-semibold text-emerald-700">Akreditasyon Güvencesi</div>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-gradient-to-br from-amber-50/60 to-white rounded-xl border border-amber-100 flex items-center gap-3 shadow-2xs">
-                        <div className="w-10 h-10 rounded-lg bg-amber-100/70 text-amber-700 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-xl">warning</span>
-                        </div>
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Düşük Yoğunluk (≤ 1 Ders)</div>
-                          <div className="text-base font-black text-amber-900">{lowCount} PÇ</div>
-                          <div className="text-[10px] font-semibold text-amber-700">İyileştirme Alanı</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Intensity Chart */}
-                <div className="border border-outline-variant rounded-xl p-4 bg-white">
-                  <div className="flex justify-between items-center mb-2">
-                    <div>
-                      <h5 className="text-xs font-bold text-on-surface">📈 Program Çıktısı (PÇ) Başına Ölçüm Yapan Ders Sayısı Dağılımı</h5>
-                      <span className="text-[10px] font-semibold text-slate-400">Yeşil: Yüksek (≥4 ders) • Mavi: Yeterli (2-3 ders) • Sarı: Düşük (1 ders) • Kırmızı: Ölçülmedi</span>
-                    </div>
-                  </div>
-                  <div className="relative h-[220px]">
-                    <canvas id="chartProgIntensity"></canvas>
-                  </div>
-                </div>
-
-                {/* Detailed Intensity Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
-                    <thead>
-                      <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
-                        <th className="px-3 py-2.5 w-16">Kod</th>
-                        <th className="px-3 py-2.5 min-w-[180px]">PÇ Tanımı</th>
-                        <th className="px-2.5 py-2.5 text-center w-24">Ölçen Ders</th>
-                        <th className="px-2.5 py-2.5 text-center w-28">Kapsam Oranı</th>
-                        <th className="px-3 py-2.5 min-w-[260px]">Ölçüm Yapan Dersler</th>
-                        <th className="px-3 py-2.5 text-center w-40">Ölçme Yoğunluğu</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {programReportData.pcIntensity?.map((item, i) => {
-                        const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
-                        return (
-                          <tr key={item.id} className={`hover:bg-slate-100/50 ${bg}`}>
-                            <td className="px-3 py-2.5 font-bold text-primary whitespace-nowrap">
-                              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-black">{item.code}</span>
-                            </td>
-                            <td className="px-3 py-2.5 text-slate-700 font-medium leading-relaxed">
-                              {item.description || '—'}
-                            </td>
-                            <td className="px-2.5 py-2.5 text-center whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-extrabold text-xs bg-slate-100 text-slate-800 border border-slate-200">
-                                <span className="material-symbols-outlined text-[13px] text-slate-500">menu_book</span>
-                                {item.courseCount} Ders
-                              </span>
-                            </td>
-                            <td className="px-2.5 py-2.5 text-center whitespace-nowrap">
-                              <div className="w-20 mx-auto">
-                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-600 mb-0.5">
-                                  <span>%{item.ratio}</span>
-                                </div>
-                                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                      item.courseCount >= 4 ? 'bg-emerald-600' :
-                                      item.courseCount >= 2 ? 'bg-blue-600' :
-                                      item.courseCount === 1 ? 'bg-amber-500' : 'bg-rose-500'
-                                    }`}
-                                    style={{ width: `${Math.min(item.ratio, 100)}%` }}
-                                  ></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2.5">
-                              {item.assessingCourses.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {item.assessingCourses.map((c, cIdx) => (
-                                    <span
-                                      key={cIdx}
-                                      className="inline-flex items-center gap-1 bg-white border border-slate-200 hover:border-primary/40 px-2 py-0.5 rounded text-[10px] text-slate-700 font-medium shadow-2xs"
-                                      title={`${c.code} - ${c.name} (${c.termName}) | Başarı: %${c.score}`}
-                                    >
-                                      <span className="font-bold text-primary">{c.code}</span>
-                                      <span className="text-slate-400">•</span>
-                                      <span className="truncate max-w-[120px]">{c.name}</span>
-                                      <span className="font-bold text-slate-900 bg-slate-100 px-1 rounded text-[9px]">%{c.score}</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="italic text-rose-500 text-[11px] font-semibold">Bu dönemde ölçüm yapan ders bulunamadı</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold border ${item.badgeBg}`}>
-                                <span className="material-symbols-outlined text-[13px]">
-                                  {item.status === 'high' ? 'verified' :
-                                   item.status === 'medium' ? 'check_circle' :
-                                   item.status === 'low' ? 'warning' : 'error'}
-                                </span>
-                                {item.statusLabel}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Accreditation Guidance Callout */}
-                {(() => {
-                  const lowPcs = programReportData.pcIntensity?.filter(p => p.courseCount <= 1) || [];
-                  return (
-                    <div className={`p-3 rounded-lg border text-xs flex items-start gap-2.5 ${
-                      lowPcs.length === 0 
-                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900' 
-                        : 'bg-amber-50/70 border-amber-200 text-amber-950'
-                    }`}>
-                      <span className={`material-symbols-outlined text-base mt-0.5 shrink-0 ${
-                        lowPcs.length === 0 ? 'text-emerald-600' : 'text-amber-600'
-                      }`}>
-                        {lowPcs.length === 0 ? 'task_alt' : 'lightbulb'}
-                      </span>
-                      <div className="leading-relaxed">
-                        <span className="font-bold">Akreditasyon & Müfredat Güvencesi Notu: </span>
-                        {lowPcs.length === 0 ? (
-                          <span>Tüm program çıktıları en az 2 bağımsız ders ve sınavla ölçülerek akreditasyon ölçüm güvencesi sağlanmıştır.</span>
-                        ) : (
-                          <span>
-                            <b>{lowPcs.map(p => p.code).join(', ')}</b> çıktısı/çıktıları incelenen dönemlerde yalnızca tek bir derste veya henüz hiç ölçülmemiştir. Akreditasyon standartları gereği (tek ders bağımlılığı riskini önlemek için) sonraki dönem müfredat planlamasında bu çıktıların ek ders ve sınav sorularıyla desteklenmesi önerilir.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Page Footer */}
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
-                  <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                  <span className="pdf-footer-page-num">Sayfa 3</span>
-                </div>
-              </div>
-
-              {/* ========================================================
-                  PAGE 4: PROGRAM ÇIKTILARI HEDEF & BAŞARI KARŞILAŞTIRMA RAPORU
+                  PAGE 3: PROGRAM ÇIKTILARI HEDEF & BAŞARI KARŞILAŞTIRMA RAPORU
                  ======================================================== */}
               <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
                 {/* Sub Header */}
@@ -4481,7 +4155,7 @@ export default function InstructorReports() {
                 {/* Page Footer */}
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                   <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                  <span className="pdf-footer-page-num">Sayfa 4</span>
+                  <span className="pdf-footer-page-num">Sayfa 3</span>
                 </div>
               </div>
 
