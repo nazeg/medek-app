@@ -35,6 +35,16 @@ export default function CoordinatorCourseOutcomes() {
     setSelectedCourseId('');
   }, [activeProgram, activeTerm]);
 
+  const getInstructorName = (course) => {
+    const inst = course?.expand?.instructor;
+    if (!inst) return null;
+    if (Array.isArray(inst)) {
+      if (inst.length === 0) return null;
+      return inst.map(i => i.title ? `${i.title} ${i.name}` : i.name).join(', ');
+    }
+    return inst.title ? `${inst.title} ${inst.name}` : inst.name;
+  };
+
   const load = async () => {
     const hasAccess = isInstructorView 
       ? (coordinatorUser && activeCourse) 
@@ -72,7 +82,8 @@ export default function CoordinatorCourseOutcomes() {
           }),
           pb.collection('courses').getFullList({ 
             sort: 'code', 
-            filter: `program = "${activeProgram.id}" && term = "${activeTerm.id}"`
+            filter: `program = "${activeProgram.id}" && term = "${activeTerm.id}"`,
+            expand: 'instructor'
           }),
           pb.collection('program_outcomes').getFullList({
             sort: 'code',
@@ -207,9 +218,13 @@ export default function CoordinatorCourseOutcomes() {
         {isInstructorView && (
           <div className="p-4 bg-slate-50 border-b border-outline-variant">
             <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold">Ders Seçin</label>
-            <select value={activeCourse?.id || ''} onChange={e => selectCourse(e.target.value)} className="w-full max-w-xs border border-outline-variant rounded-lg px-4 py-2 text-sm focus:ring-0 focus:ring-transparent bg-white font-medium">
+            <select value={activeCourse?.id || ''} onChange={e => selectCourse(e.target.value)} className="w-full max-w-md border border-outline-variant rounded-lg px-4 py-2 text-sm focus:ring-0 focus:ring-transparent bg-white font-medium">
               <option value="">Seçiniz</option>
-              {instructorCourses.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
+              {instructorCourses.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.code} - {c.name} {c.sinif ? `(${c.sinif}. Sınıf)` : ''} {c.sube ? `(Şube: ${c.sube})` : ''}
+                </option>
+              ))}
             </select>
           </div>
         )}
@@ -227,21 +242,46 @@ export default function CoordinatorCourseOutcomes() {
             {!isInstructorView && (
               <div className="p-4 bg-slate-50 border-b border-outline-variant">
                 <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold">Ders Filtrele</label>
-                <select value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)} className="w-full max-w-xs border border-outline-variant rounded-lg px-4 py-2 text-sm focus:ring-0 focus:ring-transparent bg-white font-medium">
+                <select value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)} className="w-full max-w-md border border-outline-variant rounded-lg px-4 py-2 text-sm focus:ring-0 focus:ring-transparent bg-white font-medium">
                   <option value="">Tümü</option>
-                  {courses.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
+                  {courses.map(c => {
+                    const instName = getInstructorName(c);
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.code} - {c.name} {c.sinif ? `(${c.sinif}. Sınıf)` : ''} {c.sube ? `(Şube: ${c.sube})` : ''} {instName ? `— ${instName}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}
             <div className="p-4 space-y-6 bg-slate-50/30">
               {(selectedCourseId ? courses.filter(c => c.id === selectedCourseId) : courses).map(course => {
                 const courseOutcomes = outcomes.filter(o => o.course === course.id);
+                const instructorName = getInstructorName(course);
+
                 return (
                   <div key={course.id} className="border border-outline-variant rounded-xl overflow-hidden bg-white shadow-sm">
-                    <div className="px-4 py-3 bg-slate-50 border-b border-outline-variant flex justify-between items-center">
-                      <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
-                        <span className="material-symbols-outlined text-primary text-lg">auto_stories</span>
+                    <div className="px-4 py-3 bg-slate-50 border-b border-outline-variant flex flex-wrap justify-between items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2 font-bold text-slate-800 text-sm">
+                        <span className="material-symbols-outlined text-primary text-lg flex-shrink-0">auto_stories</span>
                         <span>{course.code} - {course.name}</span>
+                        {course.sinif && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-200/80 text-slate-700 border border-slate-300/60">
+                            {course.sinif}. Sınıf
+                          </span>
+                        )}
+                        {course.sube && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200/80">
+                            Şube: {course.sube}
+                          </span>
+                        )}
+                        {instructorName && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                            <span className="material-symbols-outlined text-sm">person</span>
+                            <span>{instructorName}</span>
+                          </span>
+                        )}
                       </div>
                       <button 
                         onClick={() => { 
@@ -548,7 +588,14 @@ export default function CoordinatorCourseOutcomes() {
                     className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
                   >
                     <option value="">Seçiniz</option>
-                    {courses.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
+                    {courses.map(c => {
+                      const instName = getInstructorName(c);
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.code} - {c.name} {c.sinif ? `(${c.sinif}. Sınıf)` : ''} {c.sube ? `(Şube: ${c.sube})` : ''} {instName ? `— ${instName}` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               ) : (
@@ -556,7 +603,7 @@ export default function CoordinatorCourseOutcomes() {
                   <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold">Bağlı Ders</label>
                   <input
                     type="text"
-                    value={activeCourse ? `${activeCourse.code} - ${activeCourse.name}` : 'Seçili Ders Yok'}
+                    value={activeCourse ? `${activeCourse.code} - ${activeCourse.name} ${activeCourse.sinif ? `(${activeCourse.sinif}. Sınıf)` : ''} ${activeCourse.sube ? `(Şube: ${activeCourse.sube})` : ''}` : 'Seçili Ders Yok'}
                     disabled
                     className="w-full border border-outline-variant bg-slate-50 text-slate-500 rounded-lg px-4 py-2.5 text-sm cursor-not-allowed font-medium"
                   />
