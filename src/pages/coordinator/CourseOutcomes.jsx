@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProgram } from '../../contexts/ProgramContext';
+import { useTerm } from '../../contexts/TermContext';
 import { useActiveCourse } from '../../contexts/CourseContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
 import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
@@ -12,6 +13,7 @@ export default function CoordinatorCourseOutcomes() {
   const isInstructorView = location.pathname.startsWith('/instructor');
   const { user: coordinatorUser } = useAuth();
   const { activeProgram } = useProgram();
+  const { activeTerm } = useTerm();
   const { activeCourse, selectCourse, courses: instructorCourses } = useActiveCourse();
   const { confirm } = useAlertConfirm();
   const [outcomes, setOutcomes] = useState([]);
@@ -31,16 +33,16 @@ export default function CoordinatorCourseOutcomes() {
 
   useEffect(() => {
     setSelectedCourseId('');
-  }, [activeProgram]);
+  }, [activeProgram, activeTerm]);
 
   const load = async () => {
-    const hasAccess = isInstructorView ? (coordinatorUser && activeCourse) : (coordinatorUser && activeProgram);
+    const hasAccess = isInstructorView 
+      ? (coordinatorUser && activeCourse) 
+      : (coordinatorUser && activeProgram && activeTerm);
     if (!hasAccess) {
-      if (isInstructorView) {
-        setOutcomes([]);
-        setProgramOutcomes([]);
-        setCourses([]);
-      }
+      setOutcomes([]);
+      setProgramOutcomes([]);
+      setCourses([]);
       return;
     }
     try {
@@ -65,12 +67,12 @@ export default function CoordinatorCourseOutcomes() {
         const [o, c, po] = await Promise.all([
           pb.collection('course_outcomes').getFullList({ 
             sort: 'code', 
-            filter: `course.program = "${activeProgram.id}"`,
+            filter: `course.program = "${activeProgram.id}" && course.term = "${activeTerm.id}"`,
             expand: 'course' 
           }),
           pb.collection('courses').getFullList({ 
             sort: 'code', 
-            filter: `program = "${activeProgram.id}"`
+            filter: `program = "${activeProgram.id}" && term = "${activeTerm.id}"`
           }),
           pb.collection('program_outcomes').getFullList({
             sort: 'code',
@@ -89,7 +91,7 @@ export default function CoordinatorCourseOutcomes() {
     }
   };
 
-  useEffect(() => { load(); }, [coordinatorUser, activeProgram, activeCourse, isInstructorView]);
+  useEffect(() => { load(); }, [coordinatorUser, activeProgram, activeTerm, activeCourse, isInstructorView]);
 
   const handleSave = async () => {
     const courseId = isInstructorView ? activeCourse.id : form.course;
@@ -180,7 +182,7 @@ export default function CoordinatorCourseOutcomes() {
             Ders kazanımlarını, alt sınırlarını, başarı hedeflerini ve kanıt kararlarını tanımlayın
           </p>
         </div>
-        {((!isInstructorView && activeProgram) || (isInstructorView && activeCourse)) && (
+        {((!isInstructorView && activeProgram && activeTerm) || (isInstructorView && activeCourse)) && (
           <button 
             onClick={() => { 
               setEditItem(null); 
@@ -214,10 +216,13 @@ export default function CoordinatorCourseOutcomes() {
         {!isInstructorView && !activeProgram && (
           <div className="text-center text-on-surface-variant py-8 font-medium">Lütfen üst menüden bir program seçiniz.</div>
         )}
+        {!isInstructorView && activeProgram && !activeTerm && (
+          <div className="text-center text-on-surface-variant py-8 font-medium">Lütfen üst menüden bir dönem seçiniz.</div>
+        )}
         {isInstructorView && !activeCourse && (
           <div className="text-center text-on-surface-variant py-8 font-medium">Lütfen bir ders seçiniz.</div>
         )}
-        {((!isInstructorView && activeProgram) || (isInstructorView && activeCourse)) && (
+        {((!isInstructorView && activeProgram && activeTerm) || (isInstructorView && activeCourse)) && (
           <>
             {!isInstructorView && (
               <div className="p-4 bg-slate-50 border-b border-outline-variant">
