@@ -1880,7 +1880,362 @@ export default function InstructorReports() {
                 </div>
 
                 {/* ========================================================
-                    PAGE 2: SINAV SORU TANIMLAMA BİLGİLERİ
+                    PAGE 2: DÇ VE PÇ HEDEF & BAŞARI KARŞILAŞTIRMA ANALİZİ
+                   ======================================================== */}
+                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-5">
+                  {/* Page Sub Header */}
+                  <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                    <div>
+                      <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name) ? `• ${selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name}` : ''}</div>
+                      <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
+                      <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
+                    </div>
+                    <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+                      {analizData.modName}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-lg">flag</span>
+                      🎯 Çıktı Bazlı Hedef & Başarı Karşılaştırma Analizi
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Ders ve program çıktıları bazında gerçekleşen başarı oranlarının alt sınır ve hedef değerleriyle karşılaştırması ve hedefe ulaşma durumları
+                    </p>
+                  </div>
+
+                  {/* 1. DERS ÖĞRENME ÇIKTILARI (DÇ) KARŞILAŞTIRMA ANALİZİ */}
+                  {analizData.dcs && analizData.dcs.length > 0 && (() => {
+                    let achievedCount = 0;
+                    let warningCount = 0;
+                    let criticalCount = 0;
+
+                    analizData.dcs.forEach((dc, i) => {
+                      const val = parseFloat(analizData.dcSuccessData[i]) || 0;
+                      const minTh = dc.min_threshold ?? 50;
+                      const target = dc.target_goal ?? 70;
+                      if (val >= target) achievedCount++;
+                      else if (val >= minTh) warningCount++;
+                      else criticalCount++;
+                    });
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                            <span className="material-symbols-outlined text-primary text-base">auto_stories</span>
+                            Ders Öğrenme Çıktıları (DÇ) Başarı & Hedef Tablosu
+                          </h5>
+                        </div>
+
+                        {/* DÇ KPI Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam DÇ</span>
+                            <span className="text-base font-black text-slate-800">{analizData.dcs.length} Çıktı</span>
+                          </div>
+                          <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
+                            <span className="text-base font-black text-emerald-800">{achievedCount} DÇ (%{((achievedCount / (analizData.dcs.length || 1)) * 100).toFixed(0)})</span>
+                          </div>
+                          <div className="bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Eşik Üstü (Geliştirilmeli)</span>
+                            <span className="text-base font-black text-amber-800">{warningCount} DÇ</span>
+                          </div>
+                          <div className="bg-rose-50/60 p-2.5 rounded-lg border border-rose-200">
+                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
+                            <span className="text-base font-black text-rose-800">{criticalCount} DÇ</span>
+                          </div>
+                        </div>
+
+                        {/* DÇ Comparison Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-[11px] min-w-[650px]">
+                            <thead>
+                              <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
+                                <th className="px-3 py-2 w-16">Kod</th>
+                                <th className="px-3 py-2 min-w-[200px]">DÇ Tanımı</th>
+                                <th className="px-3 py-2 text-center w-20">Alt Sınır</th>
+                                <th className="px-3 py-2 text-center w-20">Hedef</th>
+                                <th className="px-3 py-2 text-center w-28">Gerçekleşen Başarı</th>
+                                <th className="px-3 py-2 text-center w-20">Sapma</th>
+                                <th className="px-3 py-2 text-center w-36">Durum Değerlendirmesi</th>
+                                <th className="px-3 py-2 w-44">Kanıt / Karar</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {analizData.dcs.map((dc, i) => {
+                                const val = parseFloat(analizData.dcSuccessData[i]) || 0;
+                                const minTh = dc.min_threshold ?? 50;
+                                const target = dc.target_goal ?? 70;
+                                const delta = Number((val - target).toFixed(1));
+                                const isAchieved = val >= target;
+                                const isWarning = val >= minTh && val < target;
+                                const isCritical = val < minTh;
+                                const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+
+                                return (
+                                  <tr key={dc.id} className={`hover:bg-slate-100/50 ${bg}`}>
+                                    <td className="px-3 py-2 font-bold text-primary whitespace-nowrap">
+                                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-black">{dc.code}</span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-700 font-medium leading-relaxed">
+                                      {dc.description || '—'}
+                                    </td>
+                                    <td className="px-3 py-2 text-center font-bold text-slate-600 whitespace-nowrap">
+                                      %{minTh}
+                                    </td>
+                                    <td className="px-3 py-2 text-center font-bold text-slate-800 whitespace-nowrap">
+                                      %{target}
+                                    </td>
+                                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                                      <div className="flex flex-col items-center gap-1">
+                                        <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
+                                          %{val}
+                                        </span>
+                                        <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                          <div 
+                                            className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
+                                            style={{ width: `${Math.min(val, 100)}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-center font-bold whitespace-nowrap">
+                                      {delta >= 0 ? (
+                                        <span className="text-emerald-700 font-bold">+{delta}%</span>
+                                      ) : (
+                                        <span className="text-rose-700 font-bold">{delta}%</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                                      {isAchieved && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                          <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                          Hedefe Ulaşıldı
+                                        </span>
+                                      )}
+                                      {isWarning && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                          <span className="material-symbols-outlined text-[13px]">warning</span>
+                                          Eşik Üstü / Geliştirilmeli
+                                        </span>
+                                      )}
+                                      {isCritical && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                          <span className="material-symbols-outlined text-[13px]">error</span>
+                                          Alt Sınır Altında
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      {dc.evidence ? (
+                                        <div className="relative group/tooltip inline-block max-w-[180px]">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-900 border border-amber-200/80 cursor-help hover:bg-amber-100/70">
+                                            <span className="material-symbols-outlined text-[13px] text-amber-700 flex-shrink-0">gavel</span>
+                                            <span className="truncate">{dc.evidence}</span>
+                                          </div>
+                                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 w-64 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-700 animate-fade-in pointer-events-none">
+                                            <div className="font-bold text-amber-300 flex items-center gap-1 mb-1">
+                                              <span className="material-symbols-outlined text-xs">verified</span>
+                                              Dayanak / Karar Kanıtı
+                                            </div>
+                                            <p className="leading-relaxed text-slate-200 break-words font-normal">
+                                              {dc.evidence}
+                                            </p>
+                                            <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700 transform rotate-45 absolute -bottom-1 left-4"></div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 italic">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 2. PROGRAM ÇIKTILARI (PÇ) KATKI & HEDEF KARŞILAŞTIRMA ANALİZİ (BU DERS İÇİN) */}
+                  {analizData.pcs && analizData.pcs.length > 0 && (() => {
+                    const relatedPcs = analizData.pcs.filter(pc => {
+                      return analizData.dcs.some(dc => {
+                        const entry = analizData.matrix.find(m => m.dc === dc.id && m.pc === pc.id);
+                        return entry && entry.level > 0;
+                      });
+                    });
+                    const pcsToEvaluate = relatedPcs.length > 0 ? relatedPcs : analizData.pcs;
+
+                    let achievedCount = 0;
+                    let warningCount = 0;
+                    let criticalCount = 0;
+
+                    pcsToEvaluate.forEach(pc => {
+                      const origIdx = analizData.pcs.findIndex(p => p.id === pc.id);
+                      const val = parseFloat(analizData.pcSuccessData[origIdx]) || 0;
+                      const minTh = pc.min_threshold ?? 50;
+                      const target = pc.target_goal ?? 70;
+                      if (val >= target) achievedCount++;
+                      else if (val >= minTh) warningCount++;
+                      else criticalCount++;
+                    });
+
+                    return (
+                      <div className="space-y-3 pt-4 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                            <span className="material-symbols-outlined text-primary text-base">fact_check</span>
+                            İlişkili Program Çıktıları (PÇ) Başarı & Hedef Tablosu
+                          </h5>
+                        </div>
+
+                        {/* PÇ KPI Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">İlişkili PÇ</span>
+                            <span className="text-base font-black text-slate-800">{pcsToEvaluate.length} Çıktı</span>
+                          </div>
+                          <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
+                            <span className="text-base font-black text-emerald-800">{achievedCount} PÇ (%{((achievedCount / (pcsToEvaluate.length || 1)) * 100).toFixed(0)})</span>
+                          </div>
+                          <div className="bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Eşik Üstü (Geliştirilmeli)</span>
+                            <span className="text-base font-black text-amber-800">{warningCount} PÇ</span>
+                          </div>
+                          <div className="bg-rose-50/60 p-2.5 rounded-lg border border-rose-200">
+                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
+                            <span className="text-base font-black text-rose-800">{criticalCount} PÇ</span>
+                          </div>
+                        </div>
+
+                        {/* PÇ Comparison Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-[11px] min-w-[650px]">
+                            <thead>
+                              <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
+                                <th className="px-3 py-2 w-16">Kod</th>
+                                <th className="px-3 py-2 min-w-[200px]">PÇ Tanımı</th>
+                                <th className="px-3 py-2 text-center w-20">Alt Sınır</th>
+                                <th className="px-3 py-2 text-center w-20">Hedef</th>
+                                <th className="px-3 py-2 text-center w-28">Dersteki Başarı</th>
+                                <th className="px-3 py-2 text-center w-20">Sapma</th>
+                                <th className="px-3 py-2 text-center w-36">Durum Değerlendirmesi</th>
+                                <th className="px-3 py-2 w-44">Kanıt / Karar</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {pcsToEvaluate.map(pc => {
+                                const origIdx = analizData.pcs.findIndex(p => p.id === pc.id);
+                                const val = parseFloat(analizData.pcSuccessData[origIdx]) || 0;
+                                const minTh = pc.min_threshold ?? 50;
+                                const target = pc.target_goal ?? 70;
+                                const delta = Number((val - target).toFixed(1));
+                                const isAchieved = val >= target;
+                                const isWarning = val >= minTh && val < target;
+                                const isCritical = val < minTh;
+                                const bg = origIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+
+                                return (
+                                  <tr key={pc.id} className={`hover:bg-slate-100/50 ${bg}`}>
+                                    <td className="px-3 py-2 font-bold text-primary whitespace-nowrap">
+                                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-black">{pc.code}</span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-700 font-medium leading-relaxed">
+                                      {pc.description || '—'}
+                                    </td>
+                                    <td className="px-3 py-2 text-center font-bold text-slate-600 whitespace-nowrap">
+                                      %{minTh}
+                                    </td>
+                                    <td className="px-3 py-2 text-center font-bold text-slate-800 whitespace-nowrap">
+                                      %{target}
+                                    </td>
+                                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                                      <div className="flex flex-col items-center gap-1">
+                                        <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
+                                          %{val}
+                                        </span>
+                                        <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                          <div 
+                                            className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
+                                            style={{ width: `${Math.min(val, 100)}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-center font-bold whitespace-nowrap">
+                                      {delta >= 0 ? (
+                                        <span className="text-emerald-700 font-bold">+{delta}%</span>
+                                      ) : (
+                                        <span className="text-rose-700 font-bold">{delta}%</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2 text-center whitespace-nowrap">
+                                      {isAchieved && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                          <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                          Hedefe Ulaşıldı
+                                        </span>
+                                      )}
+                                      {isWarning && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                          <span className="material-symbols-outlined text-[13px]">warning</span>
+                                          Eşik Üstü / Geliştirilmeli
+                                        </span>
+                                      )}
+                                      {isCritical && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                          <span className="material-symbols-outlined text-[13px]">error</span>
+                                          Alt Sınır Altında
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      {pc.evidence ? (
+                                        <div className="relative group/tooltip inline-block max-w-[180px]">
+                                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-900 border border-amber-200/80 cursor-help hover:bg-amber-100/70">
+                                            <span className="material-symbols-outlined text-[13px] text-amber-700 flex-shrink-0">gavel</span>
+                                            <span className="truncate">{pc.evidence}</span>
+                                          </div>
+                                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 w-64 p-2.5 bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-700 animate-fade-in pointer-events-none">
+                                            <div className="font-bold text-amber-300 flex items-center gap-1 mb-1">
+                                              <span className="material-symbols-outlined text-xs">verified</span>
+                                              Dayanak / Karar Kanıtı
+                                            </div>
+                                            <p className="leading-relaxed text-slate-200 break-words font-normal">
+                                              {pc.evidence}
+                                            </p>
+                                            <div className="w-2 h-2 bg-slate-900 border-r border-b border-slate-700 transform rotate-45 absolute -bottom-1 left-4"></div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 italic">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Page Footer */}
+                  <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                    <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                    <span className="pdf-footer-page-num">Sayfa 2</span>
+                  </div>
+                </div>
+
+                {/* ========================================================
+                    PAGE 3: SINAV SORU TANIMLAMA BİLGİLERİ
                    ======================================================== */}
                 <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
                   {/* Page Sub Header */}
@@ -1991,12 +2346,12 @@ export default function InstructorReports() {
                   {/* Page Footer */}
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                     <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                    <span className="pdf-footer-page-num">Sayfa 2</span>
+                    <span className="pdf-footer-page-num">Sayfa 3</span>
                   </div>
                 </div>
 
                 {/* ========================================================
-                    PAGE 3: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ)
+                    PAGE 4: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ)
                    ======================================================== */}
                 {(() => {
                   const studentChunks = isExportingPDF ? chunkArray(analizData.students, 30) : [analizData.students];
@@ -2070,14 +2425,14 @@ export default function InstructorReports() {
                       {/* Page Footer */}
                       <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                         <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                        <span className="pdf-footer-page-num">Sayfa 3</span>
+                        <span className="pdf-footer-page-num">Sayfa 4</span>
                       </div>
                     </div>
                   ));
                 })()}
 
                 {/* ========================================================
-                    PAGE 4: ÖĞRENCİ BAZLI BAŞARI ÖZETİ
+                    PAGE 5: ÖĞRENCİ BAZLI BAŞARI ÖZETİ
                    ======================================================== */}
                 {(() => {
                   const studentChunks = isExportingPDF ? chunkArray(analizData.students, 30) : [analizData.students];
@@ -2367,7 +2722,7 @@ export default function InstructorReports() {
                         {/* Page Footer */}
                         <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                           <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                          <span className="pdf-footer-page-num">Sayfa 4</span>
+                          <span className="pdf-footer-page-num">Sayfa 5</span>
                         </div>
                       </div>
                     );
@@ -2375,7 +2730,7 @@ export default function InstructorReports() {
                 })()}
 
                 {/* ========================================================
-                    PAGE 5: SORU İSTATİSTİKLERİ, BLOOM ZORLUK & UÇ DEĞERLER
+                    PAGE 6: SORU İSTATİSTİKLERİ, BLOOM ZORLUK & UÇ DEĞERLER
                    ======================================================== */}
                 <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-5">
                   {/* Page Sub Header */}
@@ -2713,7 +3068,7 @@ export default function InstructorReports() {
                   {/* Page Footer */}
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                     <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                    <span className="pdf-footer-page-num">Sayfa 5</span>
+                    <span className="pdf-footer-page-num">Sayfa 6</span>
                   </div>
                 </div>
 
