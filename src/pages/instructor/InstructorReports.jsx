@@ -2118,15 +2118,15 @@ export default function InstructorReports() {
                             <span className="text-base font-black text-slate-800">{analizData.dcs.length} Çıktı</span>
                           </div>
                           <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
-                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedeflenen Düzeyde</span>
                             <span className="text-base font-black text-emerald-800">{achievedCount} DÇ (%{((achievedCount / (analizData.dcs.length || 1)) * 100).toFixed(0)})</span>
                           </div>
                           <div className="bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
-                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Eşik Üstü (Geliştirilmeli)</span>
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Geliştirilmesi Gereken Düzey</span>
                             <span className="text-base font-black text-amber-800">{warningCount} DÇ</span>
                           </div>
                           <div className="bg-rose-50/60 p-2.5 rounded-lg border border-rose-200">
-                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
+                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Yetersiz Düzey</span>
                             <span className="text-base font-black text-rose-800">{criticalCount} DÇ</span>
                           </div>
                         </div>
@@ -2195,19 +2195,19 @@ export default function InstructorReports() {
                                       {isAchieved && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                           <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                          Hedefe Ulaşıldı
+                                          Hedeflenen Düzeyde
                                         </span>
                                       )}
                                       {isWarning && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                           <span className="material-symbols-outlined text-[13px]">warning</span>
-                                          Eşik Üstü / Geliştirilmeli
+                                          Geliştirilmesi Gereken Düzey
                                         </span>
                                       )}
                                       {isCritical && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                           <span className="material-symbols-outlined text-[13px]">error</span>
-                                          Alt Sınır Altında
+                                          Yetersiz Düzey
                                         </span>
                                       )}
                                     </td>
@@ -2283,15 +2283,15 @@ export default function InstructorReports() {
                             <span className="text-base font-black text-slate-800">{pcsToEvaluate.length} Çıktı</span>
                           </div>
                           <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200">
-                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedeflenen Düzeyde</span>
                             <span className="text-base font-black text-emerald-800">{achievedCount} PÇ (%{((achievedCount / (pcsToEvaluate.length || 1)) * 100).toFixed(0)})</span>
                           </div>
                           <div className="bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
-                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Eşik Üstü (Geliştirilmeli)</span>
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Geliştirilmesi Gereken Düzey</span>
                             <span className="text-base font-black text-amber-800">{warningCount} PÇ</span>
                           </div>
                           <div className="bg-rose-50/60 p-2.5 rounded-lg border border-rose-200">
-                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
+                            <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Yetersiz Düzey</span>
                             <span className="text-base font-black text-rose-800">{criticalCount} PÇ</span>
                           </div>
                         </div>
@@ -2361,19 +2361,19 @@ export default function InstructorReports() {
                                       {isAchieved && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                           <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                          Hedefe Ulaşıldı
+                                          Hedeflenen Düzeyde
                                         </span>
                                       )}
                                       {isWarning && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                           <span className="material-symbols-outlined text-[13px]">warning</span>
-                                          Eşik Üstü / Geliştirilmeli
+                                          Geliştirilmesi Gereken Düzey
                                         </span>
                                       )}
                                       {isCritical && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                           <span className="material-symbols-outlined text-[13px]">error</span>
-                                          Alt Sınır Altında
+                                          Yetersiz Düzey
                                         </span>
                                       )}
                                     </td>
@@ -3983,15 +3983,15 @@ export default function InstructorReports() {
                           <span className="text-lg font-black text-slate-800">{programReportData.pcs.length} Çıktı</span>
                         </div>
                         <div className="bg-emerald-50/60 p-3 rounded-lg border border-emerald-200">
-                          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedefe Ulaşan</span>
+                          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Hedeflenen Düzeyde</span>
                           <span className="text-lg font-black text-emerald-800">{achievedCount} PÇ (%{((achievedCount / (programReportData.pcs.length || 1)) * 100).toFixed(0)})</span>
                         </div>
                         <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200">
-                          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Eşik Üstü (Geliştirilmeli)</span>
+                          <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Geliştirilmesi Gereken Düzey</span>
                           <span className="text-lg font-black text-amber-800">{warningCount} PÇ</span>
                         </div>
                         <div className="bg-rose-50/60 p-3 rounded-lg border border-rose-200">
-                          <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Alt Sınır Altında (Kritik)</span>
+                          <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Yetersiz Düzey</span>
                           <span className="text-lg font-black text-rose-800">{criticalCount} PÇ</span>
                         </div>
                       </div>
@@ -4072,19 +4072,19 @@ export default function InstructorReports() {
                                 {isAchieved && (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                     <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                    Hedefe Ulaşıldı
+                                    Hedeflenen Düzeyde
                                   </span>
                                 )}
                                 {isWarning && (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                     <span className="material-symbols-outlined text-[13px]">warning</span>
-                                    Eşik Üstü / Geliştirilmeli
+                                    Geliştirilmesi Gereken Düzey
                                   </span>
                                 )}
                                 {isCritical && (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                     <span className="material-symbols-outlined text-[13px]">error</span>
-                                    Alt Sınır Altında
+                                    Yetersiz Düzey
                                   </span>
                                 )}
                               </td>
@@ -4179,19 +4179,19 @@ export default function InstructorReports() {
                                 {isAchieved && (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                     <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                    Hedefe Ulaşıldı
+                                    Hedeflenen Düzeyde
                                   </span>
                                 )}
                                 {isWarning && (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                     <span className="material-symbols-outlined text-[13px]">warning</span>
-                                    Eşik Üstü
+                                    Geliştirilmesi Gereken Düzey
                                   </span>
                                 )}
                                 {isCritical && (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                     <span className="material-symbols-outlined text-[13px]">error</span>
-                                    Alt Sınır Altı
+                                    Yetersiz Düzey
                                   </span>
                                 )}
                               </td>
