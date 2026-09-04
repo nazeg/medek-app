@@ -1154,9 +1154,7 @@ export default function InstructorReports() {
 
       let opinionFound = false;
       try {
-        const evals = await pb.collection('program_evaluations').getFullList({
-          sort: '-created'
-        });
+        const evals = await pb.collection('program_evaluations').getFullList();
         const ev = evals.find(e => 
           e.program === selectedProgram.id && (
             e.term_key === cohortKey || 
