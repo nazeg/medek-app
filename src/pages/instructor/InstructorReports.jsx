@@ -926,6 +926,17 @@ export default function InstructorReports() {
       const pcAggregate = {};
       pcs.forEach(pc => { pcAggregate[pc.code] = { weightedSum: 0, totalAkts: 0 }; });
 
+      // PÇ Ölçme Yoğunluğu Veri Takibi (Ders Sayısı, DÇ Sayısı, Soru Sayısı, Toplam Puan)
+      const pcIntensityMap = {};
+      pcs.forEach(pc => {
+        pcIntensityMap[pc.code] = {
+          courses: new Set(),
+          dcs: new Set(),
+          questions: new Set(),
+          totalPoints: 0
+        };
+      });
+
       const coursePcRows = [];
       const termSummaryMap = {};
 
@@ -1071,7 +1082,39 @@ export default function InstructorReports() {
                 }
               });
               coursePc[pc.code] = iliski > 0 ? katki / iliski : null;
-              if (iliski > 0) courseHasPc = true;
+              if (iliski > 0) {
+                courseHasPc = true;
+
+                // PÇ Ölçme Yoğunluğu: İlgili ders, DÇ, soru ve puan takibi
+                pcIntensityMap[pc.code].courses.add(groupKey);
+
+                const pcRelDcs = dcs.filter(dc => {
+                  const rel = matrix.find(m => m.dc === dc.id && m.pc === pc.id)?.level || 0;
+                  return rel > 0 && dcAssessed[dc.code];
+                });
+                pcRelDcs.forEach(dc => {
+                  pcIntensityMap[pc.code].dcs.add(`${groupKey}_${dc.code}`);
+                });
+
+                const pcRelDcCodes = new Set(pcRelDcs.map(d => d.code));
+                const pcRelDcIds = new Set(pcRelDcs.map(d => d.id));
+
+                questions.forEach(q => {
+                  const qType = q.expand?.exam?.type;
+                  if (qType && !useExams.includes(qType)) return;
+                  const qDcCodes = getQuestionDcCodes(q);
+                  const outcomes = q.expand?.course_outcome || q.course_outcome;
+                  const outcomeArr = Array.isArray(outcomes) ? outcomes : (outcomes ? [outcomes] : []);
+                  const qDcIds = outcomeArr.map(o => (typeof o === 'object' && o !== null ? o.id : o)).filter(Boolean);
+                  const matches = qDcCodes.some(c => pcRelDcCodes.has(c)) || qDcIds.some(id => pcRelDcIds.has(id));
+                  if (matches) {
+                    if (!pcIntensityMap[pc.code].questions.has(q.id)) {
+                      pcIntensityMap[pc.code].questions.add(q.id);
+                      pcIntensityMap[pc.code].totalPoints += Number(q.max_score) || 0;
+                    }
+                  }
+                });
+              }
             });
 
             if (courseHasPc) {
@@ -1199,6 +1242,25 @@ export default function InstructorReports() {
         }
       }
 
+      // PÇ Ölçme Yoğunluğu Tablo Verisi
+      const pcIntensity = pcs.map(pc => {
+        const item = pcIntensityMap[pc.code] || {
+          courses: new Set(),
+          dcs: new Set(),
+          questions: new Set(),
+          totalPoints: 0
+        };
+        return {
+          id: pc.id,
+          code: pc.code,
+          description: pc.description,
+          courseCount: item.courses.size,
+          dcCount: item.dcs.size,
+          questionCount: item.questions.size,
+          totalPoints: Math.round(item.totalPoints * 10) / 10
+        };
+      });
+
       setProgramReportData({
         pcs,
         cohortKey,
@@ -1208,7 +1270,8 @@ export default function InstructorReports() {
         coursePcRows,
         termSummaryMap,
         finalPcData,
-        pcAggregate
+        pcAggregate,
+        pcIntensity
       });
 
     } catch (err) {
@@ -3668,7 +3731,147 @@ export default function InstructorReports() {
               </div>
 
               {/* ========================================================
-                  PAGE 3: PROGRAM ÇIKTILARI HEDEF & BAŞARI KARŞILAŞTIRMA RAPORU
+                  PAGE 3: PROGRAM ÇIKTILARI (PÇ) ÖLÇME YOĞUNLUĞU
+                 ======================================================== */}
+              <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
+                {/* Sub Header */}
+                <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-medium">Kütahya Sağlık Bilimleri Üniversitesi {selectedProgram.expand?.faculty?.name ? `• ${selectedProgram.expand.faculty.name}` : ''}</div>
+                    <span className="font-bold text-sm text-[#0058be]">{selectedProgram.name}</span>
+                  </div>
+                  <span className="text-xs text-slate-500 font-semibold">
+                    {programReportData.selectedTerms.map(t => t.name).join(' • ')}
+                  </span>
+                </div>
+
+                {/* Section Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-lg">density_medium</span>
+                      📊 Program Çıktıları (PÇ) Ölçme Yoğunluğu
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Program çıktılarının müfredat kapsamında kaç farklı ders, ders öğrenme çıktısı (DÇ) ve sınav sorusu ile ölçüldüğünü ve toplam sınav soru puan ağırlığını gösterir.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Main Table: PÇ Ölçme Yoğunluğu */}
+                <div className="overflow-x-auto border border-outline-variant rounded-xl shadow-2xs">
+                  <table className="w-full text-left border-collapse text-xs min-w-[650px]">
+                    <thead>
+                      {/* Top Header Row as requested in screenshot */}
+                      <tr className="bg-[#0f172a] text-white border-b border-slate-700 font-bold">
+                        <th colSpan={5} className="py-2.5 px-4 text-center text-sm font-black tracking-wide uppercase bg-slate-900 border-b border-slate-800">
+                          PÇ Ölçme Yoğunluğu
+                        </th>
+                      </tr>
+                      <tr className="bg-slate-100 text-slate-700 border-b border-slate-300 font-bold text-[11px] uppercase tracking-wider">
+                        <th className="px-4 py-3 min-w-[240px]">PÇ</th>
+                        <th className="px-4 py-3 text-center w-32">Ders Sayısı</th>
+                        <th className="px-4 py-3 text-center w-32">DÇ Sayısı</th>
+                        <th className="px-4 py-3 text-center w-32">Soru Sayısı</th>
+                        <th className="px-4 py-3 text-center w-36">Toplam Puan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {programReportData.pcIntensity?.map((item, idx) => {
+                        const isEven = idx % 2 === 0;
+                        const isUnmeasured = item.courseCount === 0;
+                        return (
+                          <tr
+                            key={item.id}
+                            className={`transition-colors hover:bg-blue-50/40 ${
+                              isUnmeasured
+                                ? 'bg-rose-50/40 text-slate-600'
+                                : isEven ? 'bg-white' : 'bg-slate-50/60'
+                            }`}
+                          >
+                            {/* PÇ Kodu ve Tanımı */}
+                            <td className="px-4 py-3">
+                              <div className="flex items-start gap-2.5">
+                                <span className={`shrink-0 px-2.5 py-1 rounded font-black text-xs ${
+                                  isUnmeasured ? 'bg-rose-100 text-rose-800' : 'bg-primary/10 text-primary'
+                                }`}>
+                                  {item.code}
+                                </span>
+                                <span className="text-slate-700 font-medium text-[11px] leading-relaxed" title={item.description}>
+                                  {item.description || '—'}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Ders Sayısı */}
+                            <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex items-center justify-center min-w-[36px] px-2.5 py-1 rounded-full font-black text-xs ${
+                                item.courseCount >= 2
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : item.courseCount === 1
+                                  ? 'bg-amber-50 text-amber-900 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-800 border border-rose-200'
+                              }`}>
+                                {item.courseCount}
+                              </span>
+                            </td>
+
+                            {/* DÇ Sayısı */}
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[36px] px-2.5 py-1 rounded-full font-bold text-xs bg-slate-100 text-slate-800 border border-slate-200">
+                                {item.dcCount}
+                              </span>
+                            </td>
+
+                            {/* Soru Sayısı */}
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[36px] px-2.5 py-1 rounded-full font-bold text-xs bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                {item.questionCount}
+                              </span>
+                            </td>
+
+                            {/* Toplam Puan */}
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[48px] px-3 py-1 rounded-md font-black text-xs bg-slate-900 text-white shadow-2xs">
+                                {item.totalPoints}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {/* Summary Footer */}
+                    <tfoot className="bg-slate-100 border-t-2 border-slate-300 font-black text-xs text-slate-800">
+                      <tr>
+                        <td className="px-4 py-3 text-right uppercase tracking-wider text-slate-600">
+                          Genel Toplam
+                        </td>
+                        <td className="px-4 py-3 text-center font-black text-emerald-800">
+                          {new Set(programReportData.coursePcRows?.map(r => r.course.code || r.course.name)).size}
+                        </td>
+                        <td className="px-4 py-3 text-center font-black text-slate-900">
+                          {programReportData.pcIntensity?.reduce((s, p) => s + p.dcCount, 0) || 0}
+                        </td>
+                        <td className="px-4 py-3 text-center font-black text-indigo-900">
+                          {programReportData.pcIntensity?.reduce((s, p) => s + p.questionCount, 0) || 0}
+                        </td>
+                        <td className="px-4 py-3 text-center font-black text-slate-900">
+                          {Math.round((programReportData.pcIntensity?.reduce((s, p) => s + p.totalPoints, 0) || 0) * 10) / 10}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Page Footer */}
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                  <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                  <span className="pdf-footer-page-num">Sayfa 3</span>
+                </div>
+              </div>
+
+              {/* ========================================================
+                  PAGE 4: PROGRAM ÇIKTILARI HEDEF & BAŞARI KARŞILAŞTIRMA RAPORU
                  ======================================================== */}
               <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
                 {/* Sub Header */}
@@ -4155,7 +4358,7 @@ export default function InstructorReports() {
                 {/* Page Footer */}
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                   <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
-                  <span className="pdf-footer-page-num">Sayfa 3</span>
+                  <span className="pdf-footer-page-num">Sayfa 4</span>
                 </div>
               </div>
 
