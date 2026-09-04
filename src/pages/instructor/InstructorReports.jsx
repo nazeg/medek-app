@@ -680,7 +680,6 @@ export default function InstructorReports() {
       let courseOpinionFound = false;
       try {
         const cEvals = await pb.collection('course_evaluations').getFullList({
-          sort: '-created',
           filter: `course = "${selectedCourse.id}" && mod_name = "${displayModName}" ${activeTerm?.id ? `&& term = "${activeTerm.id}"` : ''}`
         });
         if (cEvals && cEvals.length > 0) {
