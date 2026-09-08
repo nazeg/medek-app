@@ -1,42 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import pb from '../../lib/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTerm } from '../../contexts/TermContext';
 import { useAlertConfirm } from '../../contexts/AlertConfirmContext';
+import { logAction, LOG_ACTIONS, LOG_CATEGORIES } from '../../lib/logger';
 
 export default function CoordinatorUsers() {
   const { user: coordinatorUser } = useAuth();
-  const { activeTerm } = useTerm();
   const { alert, confirm } = useAlertConfirm();
+
   const [users, setUsers] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [faculties, setFaculties] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Search and filter states
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL' | 'instructor' | 'coordinator' | 'admin'
+
+  // Modal states
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  
-  // Existing user search states
-  const [isExistingMode, setIsExistingMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedExistingUser, setSelectedExistingUser] = useState(null);
 
-  const [form, setForm] = useState({ name: '', email: '', password: '', passwordConfirm: '', role: 'instructor', title: '', programIds: [] });
+  // Form states
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    passwordConfirm: '',
+    role: 'instructor',
+    title: '',
+    faculty: '',
+    programIds: []
+  });
 
   const load = async () => {
-    if (!coordinatorUser) return;
+    setLoading(true);
     try {
-      const filterQuery = `(role = "instructor" || role = "program_head") ${coordinatorUser.faculty ? `&& faculty = "${coordinatorUser.faculty}"` : ''}`;
-      
-      const [u, p] = await Promise.all([
-        pb.collection('users').getFullList({ sort: 'name', filter: filterQuery }),
-        pb.collection('programs').getFullList({ 
-          sort: 'name', 
-          filter: `head = "${coordinatorUser.id}"`
-        }),
+      // Fetch all users across the system so coordinator can see everyone
+      const [u, p, f] = await Promise.all([
+        pb.collection('users').getFullList({ sort: 'name', expand: 'faculty' }),
+        pb.collection('programs').getFullList({ sort: 'name' }),
+        pb.collection('faculties').getFullList({ sort: 'name' }),
       ]);
       setUsers(u);
       setPrograms(p);
+      setFaculties(f);
     } catch (err) {
-      console.error('Error loading coordinator users:', err);
+      console.error('Error loading users:', err);
+      alert('Kullanıcı listesi yüklenirken bir hata oluştu: ' + (err.message || err), 'Hata', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,63 +57,171 @@ export default function CoordinatorUsers() {
     load();
   }, [coordinatorUser]);
 
-  const handleSearch = async (query) => {
-    setSearchQuery(query);
-    if (query.trim().length < 3) {
-      setSearchResults([]);
+  // Open Add Modal
+  const handleOpenAdd = () => {
+    setEditItem(null);
+    setForm({
+      name: '',
+      email: '',
+      password: '',
+      passwordConfirm: '',
+      role: 'instructor',
+      title: '',
+      faculty: coordinatorUser?.faculty || '',
+      programIds: []
+    });
+    setShowModal(true);
+  };
+
+  // Open Edit Modal
+  const handleEdit = (item) => {
+    if (item.role === 'admin') {
+      alert('Sistem yöneticisi (admin) hesapları üzerinde düzenleme yetkiniz bulunmamaktadır.', 'Yetki Sınırı', 'warning');
       return;
     }
-    try {
-      const filter = `(name ~ "${query}" || email ~ "${query}") && id != "${coordinatorUser.id}" && role != "admin"`;
-      const results = await pb.collection('users').getList(1, 15, { filter });
-      const filtered = results.items.filter(u => !users.some(ex => ex.id === u.id));
-      setSearchResults(filtered);
-    } catch (err) {
-      console.error('Error searching users:', err);
+
+    const assignedProgs = programs.filter(p => p.head === item.id).map(p => p.id);
+    setEditItem(item);
+    setForm({
+      name: item.name || '',
+      email: item.email || '',
+      password: '',
+      passwordConfirm: '',
+      role: item.role === 'program_head' ? 'program_head' : 'instructor',
+      title: item.title || '',
+      faculty: item.faculty || coordinatorUser?.faculty || '',
+      programIds: assignedProgs
+    });
+    setShowModal(true);
+  };
+
+  // Delete User
+  const handleDelete = async (id) => {
+    const targetUser = users.find(u => u.id === id);
+    if (!targetUser) return;
+
+    if (targetUser.role === 'admin') {
+      alert('Sistem yöneticisi (admin) hesapları silinemez.', 'Yetki Sınırı', 'warning');
+      return;
+    }
+
+    const confirmed = await confirm(
+      `"${targetUser.title ? targetUser.title + ' ' : ''}${targetUser.name}" (${targetUser.email}) kullanıcısını sistemden silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`
+    );
+
+    if (confirmed) {
+      try {
+        await pb.collection('users').delete(id);
+        logAction({
+          action: LOG_ACTIONS.DELETE,
+          category: LOG_CATEGORIES.USER,
+          details: `"${targetUser.title ? targetUser.title + ' ' : ''}${targetUser.name}" (${targetUser.email}) kullanıcısı Bölüm Başkanı tarafından sistemden silindi.`,
+          metadata: { userId: id, name: targetUser.name, email: targetUser.email }
+        });
+        await alert('Kullanıcı başarıyla silindi.', 'Başarılı', 'success');
+        load();
+      } catch (err) {
+        await alert('Silme işlemi başarısız: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
+      }
     }
   };
 
-  const handleSave = async () => {
+  // Toggle Active/Inactive
+  const toggleActive = async (targetUser) => {
+    if (targetUser.role === 'admin') {
+      alert('Sistem yöneticisi (admin) hesaplarının durumu değiştirilemez.', 'Yetki Sınırı', 'warning');
+      return;
+    }
+
+    const nextState = targetUser.active === false ? true : false;
+    try {
+      await pb.collection('users').update(targetUser.id, { active: nextState });
+      logAction({
+        action: LOG_ACTIONS.UPDATE,
+        category: LOG_CATEGORIES.USER,
+        details: `"${targetUser.name}" (${targetUser.email}) kullanıcısının hesap durumu ${nextState ? 'Aktif' : 'Pasif'} yapıldı.`,
+        metadata: { userId: targetUser.id, active: nextState }
+      });
+      load();
+    } catch (err) {
+      await alert('Durum güncellenirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
+    }
+  };
+
+  // Save (Create or Update)
+  const handleSave = async (e) => {
+    if (e) e.preventDefault();
+
+    if (!form.name.trim()) {
+      alert('Lütfen kullanıcı adını ve soyadını giriniz.', 'Eksik Bilgi', 'warning');
+      return;
+    }
+
+    if (!editItem) {
+      if (!form.email.trim()) {
+        alert('Lütfen geçerli bir e-posta adresi giriniz.', 'Eksik Bilgi', 'warning');
+        return;
+      }
+      if (!form.password || form.password.length < 8) {
+        alert('Şifre en az 8 karakter olmalıdır.', 'Eksik Bilgi', 'warning');
+        return;
+      }
+      if (form.password !== form.passwordConfirm) {
+        alert('Girilen şifreler birbiriyle eşleşmiyor.', 'Hata', 'error');
+        return;
+      }
+    }
+
+    // Role safety: coordinator can never assign 'admin'
+    const safeRole = form.role === 'admin' ? 'instructor' : form.role;
+
     try {
       let savedUser;
       if (editItem) {
-        const updateData = { name: form.name, role: form.role, title: form.title };
+        const updateData = {
+          name: form.name.trim(),
+          role: safeRole,
+          faculty: form.faculty || null,
+          title: form.title || ''
+        };
         savedUser = await pb.collection('users').update(editItem.id, updateData);
-      } else if (selectedExistingUser) {
-        // Promote / Assign existing user from database
-        const updateData = { role: form.role, faculty: coordinatorUser.faculty || '', title: form.title };
-        savedUser = await pb.collection('users').update(selectedExistingUser.id, updateData);
+        logAction({
+          action: LOG_ACTIONS.UPDATE,
+          category: LOG_CATEGORIES.USER,
+          details: `"${form.title ? form.title + ' ' : ''}${form.name}" kullanıcısının bilgileri güncellendi. Rol: ${roleLabels[safeRole] || safeRole}`,
+          metadata: { userId: savedUser.id, role: safeRole }
+        });
       } else {
-        // Create new user
         savedUser = await pb.collection('users').create({
-          name: form.name, 
-          email: form.email, 
+          name: form.name.trim(),
+          email: form.email.trim(),
           password: form.password,
-          passwordConfirm: form.passwordConfirm, 
-          role: form.role, 
-          faculty: coordinatorUser.faculty || '', 
-          title: form.title,
+          passwordConfirm: form.passwordConfirm,
+          role: safeRole,
+          faculty: form.faculty || null,
+          title: form.title || '',
           emailVisibility: true,
           active: true,
         });
+        logAction({
+          action: LOG_ACTIONS.CREATE,
+          category: LOG_CATEGORIES.USER,
+          details: `"${form.title ? form.title + ' ' : ''}${form.name}" (${form.email}) adlı yeni kullanıcı Bölüm Başkanı tarafından oluşturuldu.`,
+          metadata: { userId: savedUser.id, role: safeRole, email: form.email }
+        });
       }
 
-      // Program assignment logic (only if coordinator manages the program)
-      if (form.role === 'program_head') {
+      // Program assignment logic if program_head
+      if (safeRole === 'program_head') {
         const selectedProgIds = form.programIds || [];
-        const myProgIds = programs.map(p => p.id);
-        
         const toRemoveProgs = programs.filter(p => p.head === savedUser.id && !selectedProgIds.includes(p.id));
         for (const pp of toRemoveProgs) {
           await pb.collection('programs').update(pp.id, { head: '' });
         }
-        
         for (const progId of selectedProgIds) {
-          if (myProgIds.includes(progId)) {
-            const prog = programs.find(p => p.id === progId);
-            if (prog && prog.head !== savedUser.id) {
-              await pb.collection('programs').update(progId, { head: savedUser.id });
-            }
+          const prog = programs.find(p => p.id === progId);
+          if (prog && prog.head !== savedUser.id) {
+            await pb.collection('programs').update(progId, { head: savedUser.id });
           }
         }
       } else {
@@ -112,388 +233,546 @@ export default function CoordinatorUsers() {
 
       setShowModal(false);
       setEditItem(null);
-      setIsExistingMode(false);
-      setSearchQuery('');
-      setSearchResults([]);
-      setSelectedExistingUser(null);
-      setForm({ name: '', email: '', password: '', passwordConfirm: '', role: 'instructor', title: '', programIds: [] });
+      await alert(editItem ? 'Kullanıcı bilgileri güncellendi.' : 'Yeni öğretim elemanı başarıyla eklendi.', 'Başarılı', 'success');
       load();
     } catch (err) {
-      await alert('Hata: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
+      await alert('Kayıt işlemi başarısız: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
     }
   };
 
-  const handleEdit = (item) => {
-    const assignedProgs = programs.filter(p => p.head === item.id).map(p => p.id);
-    setEditItem(item);
-    setIsExistingMode(false);
-    setSelectedExistingUser(null);
-    setForm({ 
-      name: item.name, 
-      email: item.email, 
-      password: '', 
-      passwordConfirm: '', 
-      role: item.role, 
-      title: item.title || '', 
-      programIds: assignedProgs
-    });
-    setShowModal(true);
+  const roleLabels = {
+    admin: 'Sistem Yöneticisi',
+    coordinator: 'Bölüm/Program Başkanı',
+    program_head: 'Bölüm/Program Başkanı',
+    instructor: 'Öğretim Elemanı'
   };
 
-  const handleDelete = async (id) => {
-    if (await confirm('Kullanıcıyı silmek istediğinize emin misiniz?')) {
-      try {
-        await pb.collection('users').delete(id);
-        load();
-      } catch (err) {
-        await alert('Hata: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
+  const roleBadgeStyles = {
+    admin: 'bg-purple-100 text-purple-800 border border-purple-200',
+    coordinator: 'bg-blue-100 text-blue-800 border border-blue-200',
+    program_head: 'bg-blue-100 text-blue-800 border border-blue-200',
+    instructor: 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+  };
+
+  // Filtered users list
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      // Role filter
+      if (roleFilter === 'instructor' && u.role !== 'instructor') return false;
+      if (roleFilter === 'coordinator' && u.role !== 'coordinator' && u.role !== 'program_head') return false;
+      if (roleFilter === 'admin' && u.role !== 'admin') return false;
+
+      // Text search
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const fullName = (u.title ? `${u.title} ${u.name}` : u.name || '').toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const faculty = (u.expand?.faculty?.name || '').toLowerCase();
+        return fullName.includes(q) || email.includes(q) || faculty.includes(q);
       }
-    }
-  };
+      return true;
+    });
+  }, [users, roleFilter, search]);
 
-  const toggleActive = async (user) => {
-    const nextState = user.active === false ? true : false;
-    try {
-      await pb.collection('users').update(user.id, { active: nextState });
-      load();
-    } catch (err) {
-      await alert('Durum güncellenirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
-    }
-  };
-
-  const roleLabels = { program_head: 'Program Başkanı', instructor: 'Öğretim Elemanı' };
-  const roleColors = { program_head: 'bg-secondary-fixed text-on-secondary-fixed-variant', instructor: 'bg-tertiary-fixed text-on-tertiary-fixed-variant' };
+  const counts = useMemo(() => {
+    let instructors = 0;
+    let coordinators = 0;
+    let admins = 0;
+    users.forEach(u => {
+      if (u.role === 'admin') admins++;
+      else if (u.role === 'coordinator' || u.role === 'program_head') coordinators++;
+      else if (u.role === 'instructor') instructors++;
+    });
+    return { all: users.length, instructors, coordinators, admins };
+  }, [users]);
 
   return (
-    <>
-      <div className="flex justify-between items-end">
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-headline-lg text-on-surface">Kullanıcı Yönetimi</h2>
-          <p className="text-on-surface-variant mt-1 font-body-md">Bölümünüze bağlı Program Başkanları ve Öğretim Elemanları</p>
+          <h2 className="text-display-md text-on-surface font-bold">Kullanıcı Yönetimi</h2>
+          <p className="text-on-surface-variant font-body-md mt-1">
+            Bölümünüze bağlı öğretim elemanlarını ekleyebilir, tüm sistem kullanıcılarını görüntüleyebilirsiniz.
+          </p>
         </div>
-        <button 
-          onClick={() => { 
-            setEditItem(null); 
-            setIsExistingMode(false);
-            setSearchQuery('');
-            setSearchResults([]);
-            setSelectedExistingUser(null);
-            setForm({ name: '', email: '', password: '', passwordConfirm: '', role: 'instructor', title: '', programIds: [] }); 
-            setShowModal(true); 
-          }} 
-          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold shadow-md shadow-primary/20 hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95"
+        <button
+          type="button"
+          onClick={handleOpenAdd}
+          className="px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold shadow-md shadow-primary/20 hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95 cursor-pointer self-start sm:self-auto"
         >
-          <span className="material-symbols-outlined text-lg">person_add</span> Kullanıcı Ekle
+          <span className="material-symbols-outlined text-lg">person_add</span>
+          Öğretim Elemanı Ekle
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-outline-variant overflow-hidden shadow-sm">
+      {/* Filter Tabs & Search Bar */}
+      <div className="bg-white p-4 rounded-xl border border-outline-variant shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Role Filter Pills */}
+          <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setRoleFilter('ALL')}
+              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                roleFilter === 'ALL'
+                  ? 'bg-white text-primary shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tümü ({counts.all})
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('instructor')}
+              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                roleFilter === 'instructor'
+                  ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Öğretim Elemanları ({counts.instructors})
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('coordinator')}
+              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                roleFilter === 'coordinator'
+                  ? 'bg-white text-blue-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Bölüm / Program Başkanları ({counts.coordinators})
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('admin')}
+              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                roleFilter === 'admin'
+                  ? 'bg-white text-purple-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Sistem Yöneticileri ({counts.admins})
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative min-w-[260px]">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
+              search
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Ad, unvan, e-posta veya fakülte ara..."
+              className="w-full pl-9 pr-8 py-2 text-xs border border-outline-variant rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
+          <span className="material-symbols-outlined text-sm text-amber-600">info</span>
+          <span>
+            <b>Bilgi:</b> Tüm kullanıcılar listelenmektedir. Sistem Yöneticisi (Admin) hesapları korumalıdır ve üzerinde işlem yapılamaz.
+          </span>
+        </div>
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white rounded-xl border border-outline-variant overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-surface text-on-surface-variant font-label-md border-b border-outline-variant">
-                <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-xs">Kullanıcı Bilgisi</th>
-                <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-xs">Rol</th>
-                <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-xs">Atandığı Programlar</th>
-                <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-xs">Durum</th>
-                <th className="px-4 py-2.5 font-semibold uppercase tracking-wider text-right text-xs">İşlemler</th>
+              <tr className="bg-slate-50 text-slate-700 border-b border-outline-variant text-[11px] font-bold uppercase tracking-wider">
+                <th className="px-4 py-3">Kullanıcı Bilgisi</th>
+                <th className="px-4 py-3">Rol</th>
+                <th className="px-4 py-3">Fakülte / MYO</th>
+                <th className="px-4 py-3">Atandığı Programlar</th>
+                <th className="px-4 py-3 text-center">Durum</th>
+                <th className="px-4 py-3 text-right">İşlemler</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-outline-variant">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-surface-container-low transition-colors group">
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                        {u.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-on-surface text-sm">{u.title ? `${u.title} ${u.name}` : u.name}</p>
-                        <p className="text-xs text-on-surface-variant">{u.email}</p>
-                      </div>
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                      <span>Kullanıcılar yükleniyor...</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${roleColors[u.role] || ''}`}>
-                      {roleLabels[u.role] || u.role}
-                    </span>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400 font-medium">
+                    <span className="material-symbols-outlined text-4xl block mb-2 opacity-30">person_off</span>
+                    Arama kriterlerine uygun kullanıcı bulunamadı.
                   </td>
-                  <td className="px-4 py-2 text-sm text-on-surface-variant font-medium">
-                    {u.role === 'program_head' ? (
-                      <div className="flex flex-col gap-1">
-                        {programs.filter(p => p.head === u.id).map(p => (
-                          <div key={p.id} className="text-xs text-secondary font-semibold flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">account_tree</span>
-                            {p.name}
+                </tr>
+              ) : (
+                filteredUsers.map((u) => {
+                  const isAdmin = u.role === 'admin';
+                  const initials = u.name
+                    ? u.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+                    : '??';
+
+                  return (
+                    <tr
+                      key={u.id}
+                      className={`hover:bg-slate-50/80 transition-colors group ${
+                        isAdmin ? 'bg-purple-50/20' : ''
+                      }`}
+                    >
+                      {/* User Info */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                              isAdmin
+                                ? 'bg-purple-100 text-purple-800'
+                                : u.role === 'coordinator' || u.role === 'program_head'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {initials}
                           </div>
-                        ))}
-                        {programs.filter(p => p.head === u.id).length === 0 && (
-                          <div className="text-xs text-error font-semibold flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">account_tree</span>
-                            Program Atanmamış
+                          <div>
+                            <div className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                              <span>{u.title ? `${u.title} ${u.name}` : u.name}</span>
+                              {isAdmin && (
+                                <span className="material-symbols-outlined text-purple-600 text-xs" title="Sistem Yöneticisi">
+                                  shield_person
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-slate-400 text-xs font-mono">{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Role Badge */}
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${roleBadgeStyles[u.role] || 'bg-slate-100 text-slate-700'}`}>
+                          <span>{roleLabels[u.role] || u.role}</span>
+                        </span>
+                      </td>
+
+                      {/* Faculty */}
+                      <td className="px-4 py-3 text-slate-700 font-medium">
+                        {u.expand?.faculty?.name || <span className="text-slate-300 italic">—</span>}
+                      </td>
+
+                      {/* Assigned Programs */}
+                      <td className="px-4 py-3">
+                        {u.role === 'program_head' || u.role === 'coordinator' ? (
+                          <div className="flex flex-col gap-1 max-w-xs">
+                            {programs.filter(p => p.head === u.id).map(p => (
+                              <div key={p.id} className="text-xs text-primary font-semibold flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[13px]">schema</span>
+                                <span className="truncate">{p.name}</span>
+                              </div>
+                            ))}
+                            {programs.filter(p => p.head === u.id).length === 0 && (
+                              <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[10px] font-bold inline-block w-fit">
+                                Program Atanmamış
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* Active Status */}
+                      <td className="px-4 py-3 text-center">
+                        {isAdmin ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full cursor-not-allowed select-none"
+                            title="Admin hesap durumu değiştirilemez"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">lock</span>
+                            Aktif
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toggleActive(u)}
+                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              u.active !== false ? 'bg-emerald-600' : 'bg-slate-300'
+                            }`}
+                            title={u.active !== false ? 'Pasife Al' : 'Aktif Yap'}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                u.active !== false ? 'translate-x-4' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-right">
+                        {isAdmin ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md cursor-not-allowed select-none"
+                            title="Sistem yöneticisi hesapları üzerinde işlem yapma yetkisi bulunmamaktadır."
+                          >
+                            <span className="material-symbols-outlined text-xs">lock</span>
+                            İşlem Yetkisi Yok
+                          </span>
+                        ) : (
+                          <div className="flex justify-end gap-1 items-center">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(u)}
+                              className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-primary rounded-lg transition-colors cursor-pointer"
+                              title="Düzenle"
+                            >
+                              <span className="material-symbols-outlined text-base">edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(u.id)}
+                              className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                              title="Sil"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
                           </div>
                         )}
-                      </div>
-                    ) : (
-                      <span className="text-slate-400 text-xs">— (Ders atamaları program sayfasından yapılır)</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() => toggleActive(u)}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        u.active !== false ? 'bg-secondary' : 'bg-outline-variant'
-                      }`}
-                      title={u.active !== false ? 'Pasif Yap' : 'Aktif Yap'}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          u.active !== false ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEdit(u)} className="p-1.5 hover:bg-surface-container rounded-lg text-on-surface-variant"><span className="material-symbols-outlined text-lg">edit</span></button>
-                      <button onClick={() => handleDelete(u.id)} className="p-1.5 hover:bg-surface-container rounded-lg text-error"><span className="material-symbols-outlined text-lg">delete</span></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant text-sm">
-                    Henüz ekibinizde kayıtlı kullanıcı bulunmuyor.
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Add / Edit User Modal */}
       {showModal && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" 
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
           onMouseDown={(e) => { e.currentTarget.dataset.clicked = e.target === e.currentTarget ? 'true' : 'false'; }}
           onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.clicked === 'true') setShowModal(false); }}
         >
-          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto animate-scale-up border border-outline-variant">
-            <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center">
-              <h3 className="text-headline-md text-on-surface">{editItem ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}</h3>
-              <button onClick={() => setShowModal(false)} className="text-on-surface-variant hover:text-on-surface">
-                <span className="material-symbols-outlined">close</span>
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[92vh] overflow-y-auto border border-outline-variant">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-xl">
+                  {editItem ? 'manage_accounts' : 'person_add'}
+                </span>
+                <h3 className="text-base font-bold text-slate-800">
+                  {editItem ? 'Kullanıcı Düzenle' : 'Yeni Öğretim Elemanı Ekle'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer p-1 rounded-lg"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
-            <div className="p-6 space-y-4">
+
+            {/* Modal Form */}
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              {/* Title & Name */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Ünvan
+                  </label>
+                  <select
+                    value={form.title}
+                    onChange={e => setForm({ ...form, title: e.target.value })}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  >
+                    <option value="">Seçiniz</option>
+                    <option value="Prof. Dr.">Prof. Dr.</option>
+                    <option value="Doç. Dr.">Doç. Dr.</option>
+                    <option value="Dr. Öğr. Üyesi">Dr. Öğr. Üyesi</option>
+                    <option value="Öğr. Gör. Dr.">Öğr. Gör. Dr.</option>
+                    <option value="Öğr. Gör.">Öğr. Gör.</option>
+                    <option value="Arş. Gör. Dr.">Arş. Gör. Dr.</option>
+                    <option value="Arş. Gör.">Arş. Gör.</option>
+                    <option value="Öğr. Elemanı">Öğr. Elemanı</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Ad Soyad <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    placeholder="Örn: Ahmet Yılmaz"
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  E-posta Adresi <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  disabled={Boolean(editItem)}
+                  placeholder="ornek@ksbu.edu.tr"
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-slate-100 disabled:text-slate-400"
+                />
+                {editItem && (
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Kayıtlı e-posta adresi güvenlik nedeniyle değiştirilemez.
+                  </span>
+                )}
+              </div>
+
+              {/* Passwords (Only for New User) */}
               {!editItem && (
-                <div className="flex p-0.5 bg-slate-100 rounded-lg border border-outline-variant mb-4">
-                  <button
-                    type="button"
-                    onClick={() => { setIsExistingMode(false); setSelectedExistingUser(null); }}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                      !isExistingMode ? 'bg-primary text-white shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface hover:bg-white/50'
-                    }`}
-                  >
-                    Yeni Kullanıcı Oluştur
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setIsExistingMode(true); }}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                      isExistingMode ? 'bg-primary text-white shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface hover:bg-white/50'
-                    }`}
-                  >
-                    Sistemden Kullanıcı Ekle
-                  </button>
-                </div>
-              )}
-
-              {isExistingMode && !editItem && !selectedExistingUser && (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">
-                      Kullanıcı Ara (Ad Soyad veya E-posta)
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Şifre (Min. 8 Karakter) <span className="text-rose-500">*</span>
                     </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Aramak için en az 3 karakter girin..."
-                        className="w-full border border-outline-variant rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                      />
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">
-                        search
-                      </span>
-                    </div>
+                    <input
+                      type="password"
+                      required
+                      value={form.password}
+                      onChange={e => setForm({ ...form, password: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
                   </div>
-                  
-                  <div className="border border-outline-variant rounded-lg divide-y divide-outline-variant max-h-48 overflow-y-auto bg-surface-container-lowest">
-                    {searchResults.map(u => (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedExistingUser(u);
-                          setForm({
-                            ...form,
-                            name: u.name,
-                            email: u.email,
-                            role: u.role === 'admin' ? 'instructor' : u.role,
-                            title: u.title || ''
-                          });
-                        }}
-                        className="w-full text-left p-3 hover:bg-surface-container-low transition-colors flex items-center justify-between text-sm"
-                      >
-                        <div>
-                          <p className="font-semibold text-on-surface">{u.title ? `${u.title} ${u.name}` : u.name}</p>
-                          <p className="text-xs text-on-surface-variant">{u.email}</p>
-                        </div>
-                        <span className="material-symbols-outlined text-primary text-lg">
-                          add_circle
-                        </span>
-                      </button>
-                    ))}
-                    {searchQuery.trim().length >= 3 && searchResults.length === 0 && (
-                      <p className="text-xs text-on-surface-variant text-center py-4">Eşleşen kullanıcı bulunamadı.</p>
-                    )}
-                    {searchQuery.trim().length < 3 && (
-                      <p className="text-xs text-on-surface-variant text-center py-4">Arama yapmak için yazmaya başlayın.</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {(selectedExistingUser || editItem || !isExistingMode) && (
-                <div className="space-y-4">
-                  {selectedExistingUser && (
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
-                      <div className="text-sm">
-                        <p className="font-semibold text-primary text-xs uppercase tracking-wider">Seçilen Mevcut Kullanıcı</p>
-                        <p className="text-on-surface font-semibold mt-1">{form.title ? `${form.title} ${form.name}` : form.name}</p>
-                        <p className="text-xs text-on-surface-variant">{form.email}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedExistingUser(null)}
-                        className="text-xs font-bold text-error hover:underline"
-                      >
-                        Kullanıcıyı Değiştir
-                      </button>
-                    </div>
-                  )}
-
-                  {!selectedExistingUser && !editItem && !isExistingMode && (
-                    <>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Ünvan</label>
-                          <select value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
-                            <option value="">Seçiniz</option>
-                            <option value="Prof. Dr.">Prof. Dr.</option>
-                            <option value="Doç. Dr.">Doç. Dr.</option>
-                            <option value="Dr. Öğr. Üyesi">Dr. Öğr. Üyesi</option>
-                            <option value="Öğr. Gör. Dr.">Öğr. Gör. Dr.</option>
-                            <option value="Öğr. Gör.">Öğr. Gör.</option>
-                            <option value="Arş. Gör. Dr.">Arş. Gör. Dr.</option>
-                            <option value="Arş. Gör.">Arş. Gör.</option>
-                            <option value="Öğr. Elemanı">Öğr. Elemanı</option>
-                          </select>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Ad Soyad</label>
-                          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">E-posta</label>
-                        <input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Şifre</label>
-                          <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required />
-                        </div>
-                        <div>
-                          <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Şifre Tekrar</label>
-                          <input type="password" value={form.passwordConfirm} onChange={e => setForm({ ...form, passwordConfirm: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {editItem && (
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Ünvan</label>
-                        <select value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
-                          <option value="">Seçiniz</option>
-                          <option value="Prof. Dr.">Prof. Dr.</option>
-                          <option value="Doç. Dr.">Doç. Dr.</option>
-                          <option value="Dr. Öğr. Üyesi">Dr. Öğr. Üyesi</option>
-                          <option value="Öğr. Gör. Dr.">Öğr. Gör. Dr.</option>
-                          <option value="Öğr. Gör.">Öğr. Gör.</option>
-                          <option value="Arş. Gör. Dr.">Arş. Gör. Dr.</option>
-                          <option value="Arş. Gör.">Arş. Gör.</option>
-                          <option value="Öğr. Elemanı">Öğr. Elemanı</option>
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Ad Soyad</label>
-                        <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" required />
-                      </div>
-                    </div>
-                  )}
-
                   <div>
-                    <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Rol</label>
-                    <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="w-full border border-outline-variant rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
-                      <option value="instructor">Öğretim Elemanı</option>
-                      <option value="program_head">Program Başkanı</option>
-                    </select>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Şifre Tekrar <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={form.passwordConfirm}
+                      onChange={e => setForm({ ...form, passwordConfirm: e.target.value })}
+                      placeholder="••••••••"
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
                   </div>
-
-                  {form.role === 'program_head' && (
-                    <div>
-                      <label className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider block mb-1.5">Atanacağı Programlar</label>
-                      <div className="border border-outline-variant rounded-lg p-3 max-h-40 overflow-y-auto space-y-1 bg-surface-container-lowest">
-                        {programs.map(p => {
-                          const isChecked = form.programIds?.includes(p.id);
-                          return (
-                            <label key={p.id} className="flex items-center gap-2.5 text-sm font-medium text-on-surface cursor-pointer select-none hover:bg-surface-container-low p-1.5 rounded transition-colors">
-                              <input
-                                type="checkbox"
-                                checked={isChecked || false}
-                                onChange={(e) => {
-                                  const nextIds = e.target.checked
-                                    ? [...(form.programIds || []), p.id]
-                                    : (form.programIds || []).filter(id => id !== p.id);
-                                  setForm({ ...form, programIds: nextIds });
-                                }}
-                                className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
-                              />
-                              <span>{p.name}</span>
-                            </label>
-                          );
-                        })}
-                        {programs.length === 0 && (
-                          <p className="text-xs text-on-surface-variant text-center py-2">Bölümünüze bağlı henüz program bulunmuyor.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
-            </div>
-            <div className="px-6 py-4 border-t border-outline-variant flex justify-end gap-3 bg-surface-container-low">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-on-surface hover:bg-surface bg-white">İptal</button>
-              <button onClick={handleSave} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary-container">Kaydet</button>
-            </div>
+
+              {/* Role Selection (Admin is deliberately omitted) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Rol <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={form.role}
+                    onChange={e => setForm({ ...form, role: e.target.value })}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  >
+                    <option value="instructor">Öğretim Elemanı</option>
+                    <option value="program_head">Bölüm/Program Başkanı</option>
+                  </select>
+                </div>
+
+                {/* Faculty Selection */}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Fakülte / Yüksekokul
+                  </label>
+                  <select
+                    value={form.faculty}
+                    onChange={e => setForm({ ...form, faculty: e.target.value })}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  >
+                    <option value="">Seçiniz</option>
+                    {faculties.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Program assignment (Only when role is program_head) */}
+              {form.role === 'program_head' && (
+                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Atanacağı Bölümler / Programlar
+                  </label>
+                  <div className="border border-outline-variant rounded-lg p-3 max-h-36 overflow-y-auto space-y-1.5 bg-slate-50">
+                    {programs.map(p => {
+                      const isChecked = form.programIds?.includes(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          className="flex items-center gap-2.5 text-xs font-medium text-slate-800 cursor-pointer select-none hover:bg-white p-1 rounded transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked || false}
+                            onChange={(e) => {
+                              const nextIds = e.target.checked
+                                ? [...(form.programIds || []), p.id]
+                                : (form.programIds || []).filter(id => id !== p.id);
+                              setForm({ ...form, programIds: nextIds });
+                            }}
+                            className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
+                          />
+                          <span>{p.name}</span>
+                        </label>
+                      );
+                    })}
+                    {programs.length === 0 && (
+                      <p className="text-xs text-slate-400 text-center py-2">Sistemde kayıtlı program bulunmuyor.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Footer Actions */}
+              <div className="pt-4 border-t border-slate-200 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-outline-variant rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-container shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">save</span>
+                  Kaydet
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

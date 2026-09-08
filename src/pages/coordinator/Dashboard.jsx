@@ -178,7 +178,7 @@ export default function CoordinatorDashboard() {
       color: 'text-[#059669]',
       bg: 'bg-[#059669]/10',
       border: 'border-[#059669]/20',
-      to: '/coordinator/courses',
+      to: '/coordinator/users',
     },
   ];
 
@@ -187,8 +187,15 @@ export default function CoordinatorDashboard() {
       to: '/coordinator/courses',
       icon: 'auto_stories',
       label: 'Eğitim Müfredatı',
-      desc: 'Ders ve öğretim elemanı yönetimi',
+      desc: 'Ders ve müfredat yönetimi',
       accent: 'from-primary to-primary-container',
+    },
+    {
+      to: '/coordinator/users',
+      icon: 'manage_accounts',
+      label: 'Kullanıcı Yönetimi',
+      desc: 'Öğretim elemanları ve personel listesi',
+      accent: 'from-[#059669] to-[#34D399]',
     },
     {
       to: '/coordinator/program-outcomes',

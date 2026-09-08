@@ -16,6 +16,7 @@ const adminNav = [
 const coordinatorNav = [
   { to: '/coordinator', icon: 'dashboard', label: 'Genel Bakış' },
   { to: '/coordinator/courses', icon: 'auto_stories', label: 'Eğitim Müfredatı' },
+  { to: '/coordinator/users', icon: 'manage_accounts', label: 'Kullanıcılar' },
   { to: '/coordinator/program-outcomes', icon: 'target', label: 'Program Çıktıları (PÇ)' },
   { to: '/coordinator/course-outcomes', icon: 'description', label: 'Ders Çıktıları (DÇ)' },
   { to: '/coordinator/matrix', icon: 'grid_on', label: 'PÇ-DÇ Matrisi' },

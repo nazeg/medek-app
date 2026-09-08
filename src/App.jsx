@@ -15,6 +15,7 @@ import CoordinatorCourses from './pages/coordinator/Courses';
 import ProgramOutcomes from './pages/coordinator/ProgramOutcomes';
 import CoordinatorCourseOutcomes from './pages/coordinator/CourseOutcomes';
 import Matrix from './pages/coordinator/Matrix';
+import CoordinatorUsers from './pages/coordinator/Users';
 
 import InstructorDashboard from './pages/instructor/Dashboard';
 import Exams from './pages/instructor/Exams';
@@ -66,6 +67,7 @@ function AppRoutes() {
         <Route path="program-outcomes" element={<ProgramOutcomes />} />
         <Route path="course-outcomes" element={<CoordinatorCourseOutcomes />} />
         <Route path="matrix" element={<Matrix />} />
+        <Route path="users" element={<CoordinatorUsers />} />
         <Route path="reports" element={<InstructorReports />} />
       </Route>
       <Route path="/instructor" element={<ProtectedRoute roles={['instructor', 'coordinator', 'program_head']}><Layout /></ProtectedRoute>}>
