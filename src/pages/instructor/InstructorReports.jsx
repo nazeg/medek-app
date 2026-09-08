@@ -2092,12 +2092,17 @@ export default function InstructorReports() {
                     let achievedCount = 0;
                     let warningCount = 0;
                     let criticalCount = 0;
+                    let noQuestionCount = 0;
 
                     analizData.dcs.forEach((dc, i) => {
+                      const hasQuestion = analizData.dcAssessed && analizData.dcAssessed[dc.code] !== undefined
+                        ? Boolean(analizData.dcAssessed[dc.code])
+                        : (analizData.questions?.some(q => getQuestionDcCodes(q).includes(dc.code)));
                       const val = parseFloat(analizData.dcSuccessData[i]) || 0;
                       const minTh = dc.min_threshold ?? 50;
                       const target = dc.target_goal ?? 70;
-                      if (val >= target) achievedCount++;
+                      if (!hasQuestion) noQuestionCount++;
+                      else if (val >= target) achievedCount++;
                       else if (val >= minTh) warningCount++;
                       else criticalCount++;
                     });
@@ -2112,7 +2117,7 @@ export default function InstructorReports() {
                         </div>
 
                         {/* DÇ KPI Cards */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className={`grid grid-cols-2 ${noQuestionCount > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2.5`}>
                           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam DÇ</span>
                             <span className="text-base font-black text-slate-800">{analizData.dcs.length} Çıktı</span>
@@ -2129,6 +2134,12 @@ export default function InstructorReports() {
                             <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Yetersiz Düzey</span>
                             <span className="text-base font-black text-rose-800">{criticalCount} DÇ</span>
                           </div>
+                          {noQuestionCount > 0 && (
+                            <div className="bg-slate-100/70 p-2.5 rounded-lg border border-slate-300">
+                              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Soru Sorulmadı</span>
+                              <span className="text-base font-black text-slate-700">{noQuestionCount} DÇ</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* DÇ Comparison Table */}
@@ -2148,13 +2159,16 @@ export default function InstructorReports() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                               {analizData.dcs.map((dc, i) => {
+                                const hasQuestion = analizData.dcAssessed && analizData.dcAssessed[dc.code] !== undefined
+                                  ? Boolean(analizData.dcAssessed[dc.code])
+                                  : (analizData.questions?.some(q => getQuestionDcCodes(q).includes(dc.code)));
                                 const val = parseFloat(analizData.dcSuccessData[i]) || 0;
                                 const minTh = dc.min_threshold ?? 50;
                                 const target = dc.target_goal ?? 70;
                                 const delta = Number((val - target).toFixed(1));
-                                const isAchieved = val >= target;
-                                const isWarning = val >= minTh && val < target;
-                                const isCritical = val < minTh;
+                                const isAchieved = hasQuestion && val >= target;
+                                const isWarning = hasQuestion && val >= minTh && val < target;
+                                const isCritical = hasQuestion && val < minTh;
                                 const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
 
                                 return (
@@ -2173,38 +2187,43 @@ export default function InstructorReports() {
                                     </td>
                                     <td className="px-3 py-2 text-center whitespace-nowrap">
                                       <div className="flex flex-col items-center gap-1">
-                                        <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
+                                        <span className={`px-2 py-0.5 rounded font-bold text-xs ${!hasQuestion ? 'bg-slate-100 text-slate-600 border border-slate-200' : `text-white ${getBadgeColorByValue(val)}`}`}>
                                           %{val}
                                         </span>
                                         <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
                                           <div 
-                                            className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
-                                            style={{ width: `${Math.min(val, 100)}%` }}
+                                            className={`h-full rounded-full ${!hasQuestion ? 'bg-slate-300' : val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
+                                            style={{ width: `${!hasQuestion ? 0 : Math.min(val, 100)}%` }}
                                           />
                                         </div>
                                       </div>
                                     </td>
                                     <td className="px-3 py-2 text-center font-bold whitespace-nowrap">
-                                      {delta >= 0 ? (
+                                      {!hasQuestion ? (
+                                        <span className="text-slate-400 font-normal">—</span>
+                                      ) : delta >= 0 ? (
                                         <span className="text-emerald-700 font-bold">+{delta}%</span>
                                       ) : (
                                         <span className="text-rose-700 font-bold">{delta}%</span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                                      {isAchieved && (
+                                      {!hasQuestion ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                          <span className="material-symbols-outlined text-[13px]">help_outline</span>
+                                          Soru Sorulmadı
+                                        </span>
+                                      ) : isAchieved ? (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                           <span className="material-symbols-outlined text-[13px]">check_circle</span>
                                           Hedeflenen Düzeyde
                                         </span>
-                                      )}
-                                      {isWarning && (
+                                      ) : isWarning ? (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                           <span className="material-symbols-outlined text-[13px]">warning</span>
                                           Geliştirilmesi Gereken Düzey
                                         </span>
-                                      )}
-                                      {isCritical && (
+                                      ) : (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                           <span className="material-symbols-outlined text-[13px]">error</span>
                                           Yetersiz Düzey
@@ -2256,13 +2275,24 @@ export default function InstructorReports() {
                     let achievedCount = 0;
                     let warningCount = 0;
                     let criticalCount = 0;
+                    let noQuestionCount = 0;
 
                     pcsToEvaluate.forEach(pc => {
                       const origIdx = analizData.pcs.findIndex(p => p.id === pc.id);
                       const val = parseFloat(analizData.pcSuccessData[origIdx]) || 0;
                       const minTh = pc.min_threshold ?? 50;
                       const target = pc.target_goal ?? 70;
-                      if (val >= target) achievedCount++;
+                      const hasQuestion = analizData.dcs.some(dc => {
+                        const entry = analizData.matrix.find(m => m.dc === dc.id && m.pc === pc.id);
+                        if (!entry || Number(entry.level) <= 0) return false;
+                        if (analizData.dcAssessed && analizData.dcAssessed[dc.code] !== undefined) {
+                          return Boolean(analizData.dcAssessed[dc.code]);
+                        }
+                        return analizData.questions?.some(q => getQuestionDcCodes(q).includes(dc.code));
+                      });
+
+                      if (!hasQuestion) noQuestionCount++;
+                      else if (val >= target) achievedCount++;
                       else if (val >= minTh) warningCount++;
                       else criticalCount++;
                     });
@@ -2277,7 +2307,7 @@ export default function InstructorReports() {
                         </div>
 
                         {/* PÇ KPI Cards */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        <div className={`grid grid-cols-2 ${noQuestionCount > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-2.5`}>
                           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">İlişkili PÇ</span>
                             <span className="text-base font-black text-slate-800">{pcsToEvaluate.length} Çıktı</span>
@@ -2294,6 +2324,12 @@ export default function InstructorReports() {
                             <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Yetersiz Düzey</span>
                             <span className="text-base font-black text-rose-800">{criticalCount} PÇ</span>
                           </div>
+                          {noQuestionCount > 0 && (
+                            <div className="bg-slate-100/70 p-2.5 rounded-lg border border-slate-300">
+                              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Soru Sorulmadı</span>
+                              <span className="text-base font-black text-slate-700">{noQuestionCount} PÇ</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* PÇ Comparison Table */}
@@ -2318,9 +2354,17 @@ export default function InstructorReports() {
                                 const minTh = pc.min_threshold ?? 50;
                                 const target = pc.target_goal ?? 70;
                                 const delta = Number((val - target).toFixed(1));
-                                const isAchieved = val >= target;
-                                const isWarning = val >= minTh && val < target;
-                                const isCritical = val < minTh;
+                                const hasQuestion = analizData.dcs.some(dc => {
+                                  const entry = analizData.matrix.find(m => m.dc === dc.id && m.pc === pc.id);
+                                  if (!entry || Number(entry.level) <= 0) return false;
+                                  if (analizData.dcAssessed && analizData.dcAssessed[dc.code] !== undefined) {
+                                    return Boolean(analizData.dcAssessed[dc.code]);
+                                  }
+                                  return analizData.questions?.some(q => getQuestionDcCodes(q).includes(dc.code));
+                                });
+                                const isAchieved = hasQuestion && val >= target;
+                                const isWarning = hasQuestion && val >= minTh && val < target;
+                                const isCritical = hasQuestion && val < minTh;
                                 const bg = origIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
 
                                 return (
@@ -2339,38 +2383,43 @@ export default function InstructorReports() {
                                     </td>
                                     <td className="px-3 py-2 text-center whitespace-nowrap">
                                       <div className="flex flex-col items-center gap-1">
-                                        <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
+                                        <span className={`px-2 py-0.5 rounded font-bold text-xs ${!hasQuestion ? 'bg-slate-100 text-slate-600 border border-slate-200' : `text-white ${getBadgeColorByValue(val)}`}`}>
                                           %{val}
                                         </span>
                                         <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
                                           <div 
-                                            className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
-                                            style={{ width: `${Math.min(val, 100)}%` }}
+                                            className={`h-full rounded-full ${!hasQuestion ? 'bg-slate-300' : val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
+                                            style={{ width: `${!hasQuestion ? 0 : Math.min(val, 100)}%` }}
                                           />
                                         </div>
                                       </div>
                                     </td>
                                     <td className="px-3 py-2 text-center font-bold whitespace-nowrap">
-                                      {delta >= 0 ? (
+                                      {!hasQuestion ? (
+                                        <span className="text-slate-400 font-normal">—</span>
+                                      ) : delta >= 0 ? (
                                         <span className="text-emerald-700 font-bold">+{delta}%</span>
                                       ) : (
                                         <span className="text-rose-700 font-bold">{delta}%</span>
                                       )}
                                     </td>
                                     <td className="px-3 py-2 text-center whitespace-nowrap">
-                                      {isAchieved && (
+                                      {!hasQuestion ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                          <span className="material-symbols-outlined text-[13px]">help_outline</span>
+                                          Soru Sorulmadı
+                                        </span>
+                                      ) : isAchieved ? (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                           <span className="material-symbols-outlined text-[13px]">check_circle</span>
                                           Hedeflenen Düzeyde
                                         </span>
-                                      )}
-                                      {isWarning && (
+                                      ) : isWarning ? (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                           <span className="material-symbols-outlined text-[13px]">warning</span>
                                           Geliştirilmesi Gereken Düzey
                                         </span>
-                                      )}
-                                      {isCritical && (
+                                      ) : (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                           <span className="material-symbols-outlined text-[13px]">error</span>
                                           Yetersiz Düzey
@@ -3945,18 +3994,24 @@ export default function InstructorReports() {
                   let achievedCount = 0;
                   let warningCount = 0;
                   let criticalCount = 0;
+                  let noQuestionCount = 0;
 
                   programReportData.pcs.forEach((pc, i) => {
                     let val = 0;
+                    let hasQuestion = false;
                     if (progCompareTerm === 'ALL' || progCompareTerm === 'MATRIX') {
                       val = programReportData.finalPcData[i] || 0;
+                      const pcInt = programReportData.pcIntensity?.find(item => item.code === pc.code);
+                      hasQuestion = pcInt ? pcInt.questionCount > 0 : (programReportData.pcAggregate[pc.code]?.totalAkts > 0);
                     } else {
                       const ts = programReportData.termSummaryMap[progCompareTerm]?.[pc.code];
+                      hasQuestion = Boolean(ts && ts.wAkts > 0);
                       val = ts && ts.wAkts > 0 ? Number((ts.wSum / ts.wAkts).toFixed(1)) : 0;
                     }
                     const minTh = pc.min_threshold ?? 50;
                     const target = pc.target_goal ?? 70;
-                    if (val >= target) achievedCount++;
+                    if (!hasQuestion) noQuestionCount++;
+                    else if (val >= target) achievedCount++;
                     else if (val >= minTh) warningCount++;
                     else criticalCount++;
                   });
@@ -3977,7 +4032,7 @@ export default function InstructorReports() {
                           İncelenen Kapsam: <span className="underline">{currentScopeLabel}</span>
                         </div>
                       )}
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div className={`grid grid-cols-1 ${noQuestionCount > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Toplam PÇ</span>
                           <span className="text-lg font-black text-slate-800">{programReportData.pcs.length} Çıktı</span>
@@ -3994,6 +4049,12 @@ export default function InstructorReports() {
                           <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Yetersiz Düzey</span>
                           <span className="text-lg font-black text-rose-800">{criticalCount} PÇ</span>
                         </div>
+                        {noQuestionCount > 0 && (
+                          <div className="bg-slate-100/70 p-3 rounded-lg border border-slate-300">
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Soru Sorulmadı</span>
+                            <span className="text-lg font-black text-slate-700">{noQuestionCount} PÇ</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -4019,19 +4080,23 @@ export default function InstructorReports() {
                       <tbody className="divide-y divide-slate-100">
                         {programReportData.pcs.map((pc, i) => {
                           let val = 0;
+                          let hasQuestion = false;
                           if (progCompareTerm === 'ALL') {
                             val = programReportData.finalPcData[i] || 0;
+                            const pcInt = programReportData.pcIntensity?.find(item => item.code === pc.code);
+                            hasQuestion = pcInt ? pcInt.questionCount > 0 : (programReportData.pcAggregate[pc.code]?.totalAkts > 0);
                           } else {
                             const ts = programReportData.termSummaryMap[progCompareTerm]?.[pc.code];
+                            hasQuestion = Boolean(ts && ts.wAkts > 0);
                             val = ts && ts.wAkts > 0 ? Number((ts.wSum / ts.wAkts).toFixed(1)) : 0;
                           }
 
                           const minTh = pc.min_threshold ?? 50;
                           const target = pc.target_goal ?? 70;
                           const delta = Number((val - target).toFixed(1));
-                          const isAchieved = val >= target;
-                          const isWarning = val >= minTh && val < target;
-                          const isCritical = val < minTh;
+                          const isAchieved = hasQuestion && val >= target;
+                          const isWarning = hasQuestion && val >= minTh && val < target;
+                          const isCritical = hasQuestion && val < minTh;
                           const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
 
                           return (
@@ -4050,38 +4115,43 @@ export default function InstructorReports() {
                               </td>
                               <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                 <div className="flex flex-col items-center gap-1">
-                                  <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(val)}`}>
+                                  <span className={`px-2 py-0.5 rounded font-bold text-xs ${!hasQuestion ? 'bg-slate-100 text-slate-600 border border-slate-200' : `text-white ${getBadgeColorByValue(val)}`}`}>
                                     %{val}
                                   </span>
                                   <div className="w-20 bg-slate-200 h-1.5 rounded-full overflow-hidden">
                                     <div 
-                                      className={`h-full rounded-full ${val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
-                                      style={{ width: `${Math.min(val, 100)}%` }}
+                                      className={`h-full rounded-full ${!hasQuestion ? 'bg-slate-300' : val >= target ? 'bg-emerald-600' : val >= minTh ? 'bg-amber-500' : 'bg-rose-600'}`}
+                                      style={{ width: `${!hasQuestion ? 0 : Math.min(val, 100)}%` }}
                                     />
                                   </div>
                                 </div>
                               </td>
                               <td className="px-3 py-2.5 text-center font-bold whitespace-nowrap">
-                                {delta >= 0 ? (
+                                {!hasQuestion ? (
+                                  <span className="text-slate-400 font-normal">—</span>
+                                ) : delta >= 0 ? (
                                   <span className="text-emerald-700 font-bold">+{delta}%</span>
                                 ) : (
                                   <span className="text-rose-700 font-bold">{delta}%</span>
                                 )}
                               </td>
                               <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                {isAchieved && (
+                                {!hasQuestion ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                    <span className="material-symbols-outlined text-[13px]">help_outline</span>
+                                    Soru Sorulmadı
+                                  </span>
+                                ) : isAchieved ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                     <span className="material-symbols-outlined text-[13px]">check_circle</span>
                                     Hedeflenen Düzeyde
                                   </span>
-                                )}
-                                {isWarning && (
+                                ) : isWarning ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                     <span className="material-symbols-outlined text-[13px]">warning</span>
                                     Geliştirilmesi Gereken Düzey
                                   </span>
-                                )}
-                                {isCritical && (
+                                ) : (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                     <span className="material-symbols-outlined text-[13px]">error</span>
                                     Yetersiz Düzey
@@ -4116,13 +4186,15 @@ export default function InstructorReports() {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {programReportData.pcs.map((pc, i) => {
+                          const pcInt = programReportData.pcIntensity?.find(item => item.code === pc.code);
+                          const hasGeneralQuestion = pcInt ? pcInt.questionCount > 0 : (programReportData.pcAggregate[pc.code]?.totalAkts > 0);
                           const generalVal = programReportData.finalPcData[i] || 0;
                           const minTh = pc.min_threshold ?? 50;
                           const target = pc.target_goal ?? 70;
                           const generalDelta = Number((generalVal - target).toFixed(1));
-                          const isAchieved = generalVal >= target;
-                          const isWarning = generalVal >= minTh && generalVal < target;
-                          const isCritical = generalVal < minTh;
+                          const isAchieved = hasGeneralQuestion && generalVal >= target;
+                          const isWarning = hasGeneralQuestion && generalVal >= minTh && generalVal < target;
+                          const isCritical = hasGeneralQuestion && generalVal < minTh;
                           const bg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
 
                           return (
@@ -4160,14 +4232,22 @@ export default function InstructorReports() {
 
                               {/* General Score */}
                               <td className="px-3 py-2.5 text-center whitespace-nowrap bg-primary/5">
-                                <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(generalVal)}`}>
-                                  %{generalVal}
-                                </span>
+                                {!hasGeneralQuestion ? (
+                                  <span className="px-2 py-0.5 rounded font-bold text-xs bg-slate-100 text-slate-600 border border-slate-200">
+                                    %0
+                                  </span>
+                                ) : (
+                                  <span className={`px-2 py-0.5 rounded text-white font-bold text-xs ${getBadgeColorByValue(generalVal)}`}>
+                                    %{generalVal}
+                                  </span>
+                                )}
                               </td>
 
                               {/* General Delta */}
                               <td className="px-3 py-2.5 text-center font-bold whitespace-nowrap">
-                                {generalDelta >= 0 ? (
+                                {!hasGeneralQuestion ? (
+                                  <span className="text-slate-400 font-normal">—</span>
+                                ) : generalDelta >= 0 ? (
                                   <span className="text-emerald-700 font-bold">+{generalDelta}%</span>
                                 ) : (
                                   <span className="text-rose-700 font-bold">{generalDelta}%</span>
@@ -4176,19 +4256,22 @@ export default function InstructorReports() {
 
                               {/* General Status */}
                               <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                {isAchieved && (
+                                {!hasGeneralQuestion ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                    <span className="material-symbols-outlined text-[13px]">help_outline</span>
+                                    Soru Sorulmadı
+                                  </span>
+                                ) : isAchieved ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                     <span className="material-symbols-outlined text-[13px]">check_circle</span>
                                     Hedeflenen Düzeyde
                                   </span>
-                                )}
-                                {isWarning && (
+                                ) : isWarning ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                                     <span className="material-symbols-outlined text-[13px]">warning</span>
                                     Geliştirilmesi Gereken Düzey
                                   </span>
-                                )}
-                                {isCritical && (
+                                ) : (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                     <span className="material-symbols-outlined text-[13px]">error</span>
                                     Yetersiz Düzey
