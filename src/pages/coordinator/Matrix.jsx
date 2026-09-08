@@ -22,6 +22,16 @@ export default function Matrix() {
     setSelectedCourseId('');
   }, [activeProgram]);
 
+  const getInstructorName = (course) => {
+    const inst = course?.expand?.instructor;
+    if (!inst) return null;
+    if (Array.isArray(inst)) {
+      if (inst.length === 0) return null;
+      return inst.map(i => i.title ? `${i.title} ${i.name}` : i.name).join(', ');
+    }
+    return inst.title ? `${inst.title} ${inst.name}` : inst.name;
+  };
+
   useEffect(() => {
     const hasAccess = isInstructorView ? (user && activeProgram && activeTerm) : (activeProgram && activeTerm);
     if (!hasAccess) {
@@ -45,7 +55,7 @@ export default function Matrix() {
       pb.collection('program_outcomes').getFullList({ filter: `program = "${progId}"`, sort: 'code' }),
       pb.collection('course_outcomes').getFullList({ filter: dcFilter, expand: 'course', sort: 'code' }),
       pb.collection('pc_dc_matrix').getFullList({ filter: `program = "${progId}"` }),
-      pb.collection('courses').getFullList({ filter: courseFilter, sort: 'code' }),
+      pb.collection('courses').getFullList({ filter: courseFilter, expand: 'instructor', sort: 'code' }),
     ]).then(([pc, dc, m, crs]) => {
       pc.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
       dc.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
@@ -114,21 +124,46 @@ export default function Matrix() {
         {activeProgram && (
           <>
             <div className="mb-6 p-4 bg-slate-50 border border-outline-variant rounded-xl">
-              <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5">Ders Filtrele</label>
-              <select value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)} className="w-full max-w-xs border border-outline-variant rounded-lg px-4 py-2 text-sm focus:ring-0 focus:ring-transparent bg-white">
+              <label className="text-label-sm uppercase tracking-wider text-on-surface-variant block mb-1.5 font-bold">Ders Filtrele</label>
+              <select value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)} className="w-full max-w-md border border-outline-variant rounded-lg px-4 py-2 text-sm focus:ring-0 focus:ring-transparent bg-white font-medium">
                 <option value="">Tümü</option>
-                {courses.map(c => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
+                {courses.map(c => {
+                  const instName = getInstructorName(c);
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.code} - {c.name} {c.sinif ? `(${c.sinif}. Sınıf)` : ''} {c.sube ? `(Şube: ${c.sube})` : ''} {instName ? `— ${instName}` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             {pcList.length > 0 && (
               <div className="space-y-6 bg-slate-50/30 p-4 rounded-xl border border-outline-variant/50">
                 {(selectedCourseId ? courses.filter(c => c.id === selectedCourseId) : courses).map(course => {
                   const courseDcs = dcList.filter(dc => dc.course === course.id);
+                  const instructorName = getInstructorName(course);
+
                   return (
                     <div key={course.id} className="border border-outline-variant rounded-xl overflow-hidden bg-white shadow-sm p-4 space-y-4">
-                      <div className="flex items-center gap-2 font-bold text-slate-800 text-sm border-b border-outline-variant pb-2.5">
-                        <span className="material-symbols-outlined text-primary text-lg">auto_stories</span>
+                      <div className="flex flex-wrap items-center gap-2 font-bold text-slate-800 text-sm border-b border-outline-variant pb-2.5">
+                        <span className="material-symbols-outlined text-primary text-lg flex-shrink-0">auto_stories</span>
                         <span>{course.code} - {course.name}</span>
+                        {course.sinif && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-200/80 text-slate-700 border border-slate-300/60">
+                            {course.sinif}. Sınıf
+                          </span>
+                        )}
+                        {course.sube && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200/80">
+                            Şube: {course.sube}
+                          </span>
+                        )}
+                        {instructorName && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                            <span className="material-symbols-outlined text-sm">person</span>
+                            <span>{instructorName}</span>
+                          </span>
+                        )}
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
