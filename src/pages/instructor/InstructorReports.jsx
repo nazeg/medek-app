@@ -2506,130 +2506,7 @@ export default function InstructorReports() {
                     );
                   })()}
 
-                  {/* ========================================================
-                      DERSİ VEREN ÖĞRETİM ELEMANI DEĞERLENDİRME VE İYİLEŞTİRME GÖRÜŞÜ
-                     ======================================================== */}
-                  <div className="pt-4 border-t border-slate-200 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-on-surface flex items-center gap-2">
-                          <span className="material-symbols-outlined text-primary text-lg">rate_review</span>
-                          ✍️ Dersi Veren Öğretim Elemanı Değerlendirme & İyileştirme Görüşü
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
-                          <span className="text-[11px] font-semibold text-slate-500">Değerlendirilen Kapsam:</span>
-                          <span className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold">
-                            <span>{selectedCourse.code} — {selectedCourse.name}</span>
-                            {selectedCourse.sube && <span>(Şube: {selectedCourse.sube})</span>}
-                            <span>• {analizData.modName}</span>
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* Web View Save Action */}
-                      <div className="pdf-hide flex items-center gap-2">
-                        {courseOpinionSaved && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 animate-fade-in">
-                            <span className="material-symbols-outlined text-sm">check_circle</span>
-                            Kaydedildi
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleSaveCourseOpinion}
-                          disabled={savingCourseOpinion}
-                          className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold shadow-sm hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          {savingCourseOpinion ? (
-                            <>
-                              <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
-                              Kaydediliyor...
-                            </>
-                          ) : (
-                            <>
-                              <span className="material-symbols-outlined text-sm">save</span>
-                              Görüşü Kaydet
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Interactive Editor (pdf-hide) */}
-                    <div className="pdf-hide bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                      <textarea
-                        value={courseOpinion}
-                        onChange={e => setCourseOpinion(e.target.value)}
-                        rows={4}
-                        className="w-full bg-white border border-outline-variant rounded-lg p-3 text-xs leading-relaxed text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400 font-normal"
-                        placeholder="Ders çıktılarının gerçekleşme oranları ve hedeften sapmalar değerlendirildiğinde; hedeflenen başarıya ulaşan çıktılar, ulaşılamayan çıktılar için sonraki dönemde alınacak tedbirler ve sürekli iyileştirme hususları hakkında ders sorumlusu görüşü..."
-                      />
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                            Öğretim Elemanı (Adı Soyadı)
-                          </label>
-                          <input
-                            type="text"
-                            value={courseEvaluatorName}
-                            onChange={e => setCourseEvaluatorName(e.target.value)}
-                            placeholder="Örn: Dr. Öğr. Üyesi Ahmet Yılmaz"
-                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                            Görevi / Unvanı
-                          </label>
-                          <input
-                            type="text"
-                            value={courseEvaluatorTitle}
-                            onChange={e => setCourseEvaluatorTitle(e.target.value)}
-                            placeholder="Ders Sorumlusu / Öğretim Elemanı"
-                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                            Değerlendirme Tarihi
-                          </label>
-                          <input
-                            type="text"
-                            value={courseEvaluatorDate}
-                            onChange={e => setCourseEvaluatorDate(e.target.value)}
-                            placeholder={new Date().toLocaleDateString('tr-TR')}
-                            className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Formal Print & PDF View Layout (pdf-show) */}
-                    <div className="hidden pdf-show border border-slate-300 rounded-lg p-4 bg-slate-50/50 space-y-4">
-                      <div className="text-xs text-slate-800 leading-relaxed min-h-[60px] whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
-                        {courseOpinion ? courseOpinion : (
-                          <span className="italic text-slate-400">
-                            (Ders çıktıları değerlendirme ve sürekli iyileştirme görüşü henüz girilmemiştir.)
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex justify-between items-end pt-3 border-t border-slate-200 text-xs">
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Değerlendirme Tarihi</span>
-                          <span className="font-bold text-slate-700">{courseEvaluatorDate || new Date().toLocaleDateString('tr-TR')}</span>
-                        </div>
-                        <div className="text-right min-w-[200px] space-y-1">
-                          <div className="font-bold text-slate-900">{courseEvaluatorName || 'Ders Sorumlusu'}</div>
-                          <div className="text-[10px] font-semibold text-slate-500">{courseEvaluatorTitle || 'Öğretim Elemanı'}</div>
-                          <div className="pt-4 text-[10px] text-slate-400 font-medium border-b border-dashed border-slate-400 pb-1">
-                            İmza: _______________________
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Page Footer */}
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
@@ -3473,6 +3350,160 @@ export default function InstructorReports() {
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
                     <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
                     <span className="pdf-footer-page-num">Sayfa 6</span>
+                  </div>
+                </div>
+
+                {/* ========================================================
+                    PAGE 7: DERSİ VEREN ÖĞRETİM ELEMANI DEĞERLENDİRME & İYİLEŞTİRME GÖRÜŞÜ
+                   ======================================================== */}
+                <div className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-6">
+                  {/* Page Sub Header */}
+                  <div className="flex justify-between items-center pb-3 border-b border-outline-variant">
+                    <div>
+                      <div className="text-[11px] text-slate-400 font-medium">
+                        Kütahya Sağlık Bilimleri Üniversitesi {(selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name) ? `• ${selectedCourse.expand?.program?.expand?.faculty?.name || selectedProgram?.expand?.faculty?.name}` : ''}
+                      </div>
+                      <span className="font-bold text-sm text-[#0058be]">{selectedCourse.code} — {selectedCourse.name}</span>
+                      <span className="text-xs text-slate-500 ml-2">({activeTerm?.name})</span>
+                    </div>
+                    <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-xs font-bold">
+                      {analizData.modName}
+                    </span>
+                  </div>
+
+                  {/* Header & Meta */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-bold text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-xl">rate_review</span>
+                        ✍️ Dersi Veren Öğretim Elemanı Değerlendirme & İyileştirme Görüşü
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Dersin hedeflerine ulaşma düzeyi, DÇ ve PÇ kazanımları, öğrenci başarı dinamikleri ve sürekli kalite iyileştirme önerileri.
+                      </p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap text-xs">
+                        <span className="text-[11px] font-semibold text-slate-500">Değerlendirilen Kapsam:</span>
+                        <span className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2.5 py-0.5 rounded text-[11px] font-bold">
+                          <span>{selectedCourse.code} — {selectedCourse.name}</span>
+                          {selectedCourse.sube && <span>(Şube: {selectedCourse.sube})</span>}
+                          <span>• {analizData.modName}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Web View Save Action */}
+                    <div className="pdf-hide flex items-center gap-2 self-start sm:self-auto">
+                      {courseOpinionSaved && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 animate-fade-in">
+                          <span className="material-symbols-outlined text-sm">check_circle</span>
+                          Kaydedildi
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleSaveCourseOpinion}
+                        disabled={savingCourseOpinion}
+                        className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-bold shadow-sm hover:bg-primary-container transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {savingCourseOpinion ? (
+                          <>
+                            <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                            Kaydediliyor...
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-sm">save</span>
+                            Görüşü Kaydet
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Interactive Editor (pdf-hide) */}
+                  <div className="pdf-hide bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                        Değerlendirme ve İyileştirme Raporu
+                      </label>
+                      <textarea
+                        value={courseOpinion}
+                        onChange={e => setCourseOpinion(e.target.value)}
+                        rows={8}
+                        className="w-full bg-white border border-outline-variant rounded-lg p-3.5 text-xs leading-relaxed text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-slate-400 font-normal"
+                        placeholder="Ders çıktılarının gerçekleşme oranları ve hedeften sapmalar değerlendirildiğinde; hedeflenen başarıya ulaşan çıktılar, ulaşılamayan çıktılar için sonraki dönemde alınacak tedbirler ve sürekli iyileştirme hususları hakkında ders sorumlusu görüşü..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Öğretim Elemanı (Adı Soyadı)
+                        </label>
+                        <input
+                          type="text"
+                          value={courseEvaluatorName}
+                          onChange={e => setCourseEvaluatorName(e.target.value)}
+                          placeholder="Örn: Dr. Öğr. Üyesi Ahmet Yılmaz"
+                          className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Görevi / Unvanı
+                        </label>
+                        <input
+                          type="text"
+                          value={courseEvaluatorTitle}
+                          onChange={e => setCourseEvaluatorTitle(e.target.value)}
+                          placeholder="Ders Sorumlusu / Öğretim Elemanı"
+                          className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Değerlendirme Tarihi
+                        </label>
+                        <input
+                          type="text"
+                          value={courseEvaluatorDate}
+                          onChange={e => setCourseEvaluatorDate(e.target.value)}
+                          placeholder={new Date().toLocaleDateString('tr-TR')}
+                          className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Formal Print & PDF View Layout (pdf-show) */}
+                  <div className="hidden pdf-show border border-slate-300 rounded-xl p-6 bg-slate-50/50 space-y-6 flex-1">
+                    <div className="text-xs text-slate-800 leading-relaxed min-h-[300px] whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
+                      {courseOpinion ? courseOpinion : (
+                        <span className="italic text-slate-400">
+                          (Ders çıktıları değerlendirme ve sürekli iyileştirme görüşü henüz girilmemiştir.)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-end pt-6 border-t border-slate-300 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Değerlendirme Tarihi</span>
+                        <span className="font-bold text-slate-700">{courseEvaluatorDate || new Date().toLocaleDateString('tr-TR')}</span>
+                      </div>
+                      <div className="text-right min-w-[220px] space-y-1">
+                        <div className="font-bold text-slate-900">{courseEvaluatorName || 'Ders Sorumlusu'}</div>
+                        <div className="text-[10px] font-semibold text-slate-500">{courseEvaluatorTitle || 'Öğretim Elemanı'}</div>
+                        <div className="pt-8 text-[10px] text-slate-400 font-medium border-b border-dashed border-slate-400 pb-1">
+                          İmza: _______________________
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Page Footer */}
+                  <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-medium select-none">
+                    <span>MEDEK Eğitim ve Akreditasyon Değerlendirme Sistemi</span>
+                    <span className="pdf-footer-page-num">Sayfa 7</span>
                   </div>
                 </div>
 
