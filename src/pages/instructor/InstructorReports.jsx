@@ -2758,7 +2758,7 @@ export default function InstructorReports() {
                     PAGE 4: ÖĞRENCİ KAZANIM ÖZETİ (DÇ & PÇ)
                    ======================================================== */}
                 {(() => {
-                  const studentChunks = isExportingPDF ? chunkArray(analizData.students, 30) : [analizData.students];
+                  const studentChunks = isExportingPDF ? chunkArray(analizData.students, 20) : [analizData.students];
 
                   return studentChunks.map((chunk, chunkIdx) => (
                     <div key={`kazanim-page-${chunkIdx}`} className="pdf-page bg-white p-6 rounded-xl border border-outline-variant space-y-4">
@@ -2779,7 +2779,7 @@ export default function InstructorReports() {
                           <h4 className="text-sm font-bold text-on-surface">🎓 Öğrenci Kazanım Özeti ({analizData.modName})</h4>
                           {studentChunks.length > 1 && (
                             <span className="text-xs text-slate-500 font-semibold">
-                              Öğrenci {chunkIdx * 30 + 1} - {Math.min((chunkIdx + 1) * 30, analizData.students.length)} / {analizData.students.length}
+                              Öğrenci {chunkIdx * 20 + 1} - {Math.min((chunkIdx + 1) * 20, analizData.students.length)} / {analizData.students.length}
                             </span>
                           )}
                         </div>
@@ -2839,7 +2839,7 @@ export default function InstructorReports() {
                     PAGE 5: ÖĞRENCİ BAZLI BAŞARI ÖZETİ
                    ======================================================== */}
                 {(() => {
-                  const studentChunks = isExportingPDF ? chunkArray(analizData.students, 30) : [analizData.students];
+                  const studentChunks = isExportingPDF ? chunkArray(analizData.students, 20) : [analizData.students];
                   const isCombo = analizData.isComboMode;
 
                   // Pre-calculate whole-class averages
@@ -2930,7 +2930,7 @@ export default function InstructorReports() {
                             <h4 className="text-sm font-bold text-on-surface">🧑‍🎓 Öğrenci Bazlı Başarı Özeti ({analizData.modName})</h4>
                             {studentChunks.length > 1 && (
                               <span className="text-xs text-slate-500 font-semibold">
-                                Öğrenci {chunkIdx * 30 + 1} - {Math.min((chunkIdx + 1) * 30, analizData.students.length)} / {analizData.students.length}
+                                Öğrenci {chunkIdx * 20 + 1} - {Math.min((chunkIdx + 1) * 20, analizData.students.length)} / {analizData.students.length}
                               </span>
                             )}
                           </div>
