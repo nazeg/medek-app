@@ -1502,6 +1502,22 @@ export default function InstructorReports() {
               el.style.overflow = 'visible';
               el.style.maxHeight = 'none';
             });
+            clonedDoc.querySelectorAll('.pdf-hide').forEach(el => {
+              el.style.setProperty('display', 'none', 'important');
+            });
+            clonedDoc.querySelectorAll('.pdf-show').forEach(el => {
+              el.style.setProperty('display', 'block', 'important');
+              el.classList.remove('hidden');
+            });
+            clonedDoc.querySelectorAll('textarea').forEach(ta => {
+              const div = clonedDoc.createElement('div');
+              div.className = ta.className;
+              div.style.whiteSpace = 'pre-wrap';
+              div.style.wordBreak = 'break-word';
+              div.style.overflowWrap = 'break-word';
+              div.textContent = ta.value || '';
+              ta.parentNode?.replaceChild(div, ta);
+            });
             const clonedPages = clonedDoc.querySelectorAll('.pdf-page');
             clonedPages.forEach((page, idx) => {
               const numEl = page.querySelector('.pdf-footer-page-num');
@@ -1544,6 +1560,17 @@ export default function InstructorReports() {
               }
               img {
                 display: inline-block !important;
+              }
+              .pdf-hide {
+                display: none !important;
+              }
+              .pdf-show {
+                display: block !important;
+              }
+              .whitespace-pre-wrap {
+                white-space: pre-wrap !important;
+                word-break: break-word !important;
+                overflow-wrap: break-word !important;
               }
             `;
             clonedDoc.head.appendChild(style);
@@ -1614,6 +1641,22 @@ export default function InstructorReports() {
               el.style.overflow = 'visible';
               el.style.maxHeight = 'none';
             });
+            clonedDoc.querySelectorAll('.pdf-hide').forEach(el => {
+              el.style.setProperty('display', 'none', 'important');
+            });
+            clonedDoc.querySelectorAll('.pdf-show').forEach(el => {
+              el.style.setProperty('display', 'block', 'important');
+              el.classList.remove('hidden');
+            });
+            clonedDoc.querySelectorAll('textarea').forEach(ta => {
+              const div = clonedDoc.createElement('div');
+              div.className = ta.className;
+              div.style.whiteSpace = 'pre-wrap';
+              div.style.wordBreak = 'break-word';
+              div.style.overflowWrap = 'break-word';
+              div.textContent = ta.value || '';
+              ta.parentNode?.replaceChild(div, ta);
+            });
             const clonedPages = clonedDoc.querySelectorAll('.pdf-page');
             clonedPages.forEach((page, idx) => {
               const numEl = page.querySelector('.pdf-footer-page-num');
@@ -1662,6 +1705,11 @@ export default function InstructorReports() {
               }
               .pdf-show {
                 display: block !important;
+              }
+              .whitespace-pre-wrap {
+                white-space: pre-wrap !important;
+                word-break: break-word !important;
+                overflow-wrap: break-word !important;
               }
             `;
             clonedDoc.head.appendChild(style);
@@ -2559,7 +2607,7 @@ export default function InstructorReports() {
 
                     {/* Formal Print & PDF View Layout (pdf-show) */}
                     <div className="hidden pdf-show border border-slate-300 rounded-lg p-4 bg-slate-50/50 space-y-4">
-                      <div className="text-xs text-slate-800 leading-relaxed min-h-[60px] whitespace-pre-wrap">
+                      <div className="text-xs text-slate-800 leading-relaxed min-h-[60px] whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
                         {courseOpinion ? courseOpinion : (
                           <span className="italic text-slate-400">
                             (Ders çıktıları değerlendirme ve sürekli iyileştirme görüşü henüz girilmemiştir.)
@@ -4414,7 +4462,7 @@ export default function InstructorReports() {
 
                   {/* Formal Print & PDF View Layout */}
                   <div className="hidden pdf-show border border-slate-300 rounded-lg p-4 bg-slate-50/50 space-y-4">
-                    <div className="text-xs text-slate-800 leading-relaxed min-h-[60px] whitespace-pre-wrap">
+                    <div className="text-xs text-slate-800 leading-relaxed min-h-[60px] whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>
                       {headOpinion ? headOpinion : (
                         <span className="italic text-slate-400">
                           (Dönemsel değerlendirme ve sürekli iyileştirme görüşü henüz girilmemiştir.)
