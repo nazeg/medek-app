@@ -15,7 +15,7 @@ export default function CoordinatorUsers() {
 
   // Search and filter states
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL' | 'instructor' | 'coordinator' | 'admin'
+  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL' | 'instructor' | 'coordinator'
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -29,20 +29,20 @@ export default function CoordinatorUsers() {
     passwordConfirm: '',
     role: 'instructor',
     title: '',
-    faculty: '',
-    programIds: []
+    faculty: ''
   });
 
   const load = async () => {
     setLoading(true);
     try {
-      // Fetch all users across the system so coordinator can see everyone
+      // Sistem yöneticileri hariç tüm kullanıcıları getir
       const [u, p, f] = await Promise.all([
-        pb.collection('users').getFullList({ sort: 'name', expand: 'faculty' }),
+        pb.collection('users').getFullList({ sort: 'name', expand: 'faculty', filter: 'role != "admin"' }),
         pb.collection('programs').getFullList({ sort: 'name' }),
         pb.collection('faculties').getFullList({ sort: 'name' }),
       ]);
-      setUsers(u);
+      const nonAdminUsers = u.filter(user => user.role !== 'admin');
+      setUsers(nonAdminUsers);
       setPrograms(p);
       setFaculties(f);
     } catch (err) {
@@ -67,93 +67,39 @@ export default function CoordinatorUsers() {
       passwordConfirm: '',
       role: 'instructor',
       title: '',
-      faculty: coordinatorUser?.faculty || '',
-      programIds: []
+      faculty: coordinatorUser?.faculty || ''
     });
     setShowModal(true);
   };
 
   // Open Edit Modal
   const handleEdit = (item) => {
-    if (item.role === 'admin') {
-      alert('Sistem yöneticisi (admin) hesapları üzerinde düzenleme yetkiniz bulunmamaktadır.', 'Yetki Sınırı', 'warning');
+    if (item.role !== 'instructor') {
+      alert('Bölüm Başkanı yalnızca öğretim elemanları üzerinde düzenleme yapabilir.', 'Yetki Sınırı', 'warning');
       return;
     }
 
-    const assignedProgs = programs.filter(p => p.head === item.id).map(p => p.id);
     setEditItem(item);
     setForm({
       name: item.name || '',
       email: item.email || '',
       password: '',
       passwordConfirm: '',
-      role: item.role === 'program_head' ? 'program_head' : 'instructor',
+      role: 'instructor', // Rol kesinlikle ve sadece instructor kalır
       title: item.title || '',
-      faculty: item.faculty || coordinatorUser?.faculty || '',
-      programIds: assignedProgs
+      faculty: item.faculty || coordinatorUser?.faculty || ''
     });
     setShowModal(true);
   };
 
-  // Delete User
-  const handleDelete = async (id) => {
-    const targetUser = users.find(u => u.id === id);
-    if (!targetUser) return;
 
-    if (targetUser.role === 'admin') {
-      alert('Sistem yöneticisi (admin) hesapları silinemez.', 'Yetki Sınırı', 'warning');
-      return;
-    }
-
-    const confirmed = await confirm(
-      `"${targetUser.title ? targetUser.title + ' ' : ''}${targetUser.name}" (${targetUser.email}) kullanıcısını sistemden silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`
-    );
-
-    if (confirmed) {
-      try {
-        await pb.collection('users').delete(id);
-        logAction({
-          action: LOG_ACTIONS.DELETE,
-          category: LOG_CATEGORIES.USER,
-          details: `"${targetUser.title ? targetUser.title + ' ' : ''}${targetUser.name}" (${targetUser.email}) kullanıcısı Bölüm Başkanı tarafından sistemden silindi.`,
-          metadata: { userId: id, name: targetUser.name, email: targetUser.email }
-        });
-        await alert('Kullanıcı başarıyla silindi.', 'Başarılı', 'success');
-        load();
-      } catch (err) {
-        await alert('Silme işlemi başarısız: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
-      }
-    }
-  };
-
-  // Toggle Active/Inactive
-  const toggleActive = async (targetUser) => {
-    if (targetUser.role === 'admin') {
-      alert('Sistem yöneticisi (admin) hesaplarının durumu değiştirilemez.', 'Yetki Sınırı', 'warning');
-      return;
-    }
-
-    const nextState = targetUser.active === false ? true : false;
-    try {
-      await pb.collection('users').update(targetUser.id, { active: nextState });
-      logAction({
-        action: LOG_ACTIONS.UPDATE,
-        category: LOG_CATEGORIES.USER,
-        details: `"${targetUser.name}" (${targetUser.email}) kullanıcısının hesap durumu ${nextState ? 'Aktif' : 'Pasif'} yapıldı.`,
-        metadata: { userId: targetUser.id, active: nextState }
-      });
-      load();
-    } catch (err) {
-      await alert('Durum güncellenirken hata oluştu: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
-    }
-  };
 
   // Save (Create or Update)
   const handleSave = async (e) => {
     if (e) e.preventDefault();
 
     if (!form.name.trim()) {
-      alert('Lütfen kullanıcı adını ve soyadını giriniz.', 'Eksik Bilgi', 'warning');
+      alert('Lütfen öğretim elemanının adını ve soyadını giriniz.', 'Eksik Bilgi', 'warning');
       return;
     }
 
@@ -162,6 +108,20 @@ export default function CoordinatorUsers() {
         alert('Lütfen geçerli bir e-posta adresi giriniz.', 'Eksik Bilgi', 'warning');
         return;
       }
+
+      // Sistemde bu e-posta adresiyle kayıtlı kullanıcı var mı kontrol et
+      try {
+        const checkRes = await pb.collection('users').getList(1, 1, {
+          filter: `email = "${form.email.trim()}"`
+        });
+        if (checkRes.items.length > 0) {
+          alert(`"${form.email.trim()}" e-posta adresine sahip bir kullanıcı sistemde zaten kayıtlıdır. Bölüm başkanı yalnızca sistemde bulunmayan yeni öğretim elemanlarını ekleyebilir.`, 'Kullanıcı Zaten Mevcut', 'warning');
+          return;
+        }
+      } catch (checkErr) {
+        console.warn('Email check warning:', checkErr);
+      }
+
       if (!form.password || form.password.length < 8) {
         alert('Şifre en az 8 karakter olmalıdır.', 'Eksik Bilgi', 'warning');
         return;
@@ -172,8 +132,8 @@ export default function CoordinatorUsers() {
       }
     }
 
-    // Role safety: coordinator can never assign 'admin'
-    const safeRole = form.role === 'admin' ? 'instructor' : form.role;
+    // Rol daima ve kesinlikle 'instructor'
+    const safeRole = 'instructor';
 
     try {
       let savedUser;
@@ -188,7 +148,7 @@ export default function CoordinatorUsers() {
         logAction({
           action: LOG_ACTIONS.UPDATE,
           category: LOG_CATEGORIES.USER,
-          details: `"${form.title ? form.title + ' ' : ''}${form.name}" kullanıcısının bilgileri güncellendi. Rol: ${roleLabels[safeRole] || safeRole}`,
+          details: `"${form.title ? form.title + ' ' : ''}${form.name}" öğretim elemanının bilgileri güncellendi.`,
           metadata: { userId: savedUser.id, role: safeRole }
         });
       } else {
@@ -206,34 +166,14 @@ export default function CoordinatorUsers() {
         logAction({
           action: LOG_ACTIONS.CREATE,
           category: LOG_CATEGORIES.USER,
-          details: `"${form.title ? form.title + ' ' : ''}${form.name}" (${form.email}) adlı yeni kullanıcı Bölüm Başkanı tarafından oluşturuldu.`,
+          details: `"${form.title ? form.title + ' ' : ''}${form.name}" (${form.email}) adlı yeni öğretim elemanı oluşturuldu.`,
           metadata: { userId: savedUser.id, role: safeRole, email: form.email }
         });
       }
 
-      // Program assignment logic if program_head
-      if (safeRole === 'program_head') {
-        const selectedProgIds = form.programIds || [];
-        const toRemoveProgs = programs.filter(p => p.head === savedUser.id && !selectedProgIds.includes(p.id));
-        for (const pp of toRemoveProgs) {
-          await pb.collection('programs').update(pp.id, { head: '' });
-        }
-        for (const progId of selectedProgIds) {
-          const prog = programs.find(p => p.id === progId);
-          if (prog && prog.head !== savedUser.id) {
-            await pb.collection('programs').update(progId, { head: savedUser.id });
-          }
-        }
-      } else {
-        const previousProgs = programs.filter(p => p.head === savedUser.id);
-        for (const pp of previousProgs) {
-          await pb.collection('programs').update(pp.id, { head: '' });
-        }
-      }
-
       setShowModal(false);
       setEditItem(null);
-      await alert(editItem ? 'Kullanıcı bilgileri güncellendi.' : 'Yeni öğretim elemanı başarıyla eklendi.', 'Başarılı', 'success');
+      await alert(editItem ? 'Öğretim elemanı bilgileri güncellendi.' : 'Yeni öğretim elemanı başarıyla eklendi.', 'Başarılı', 'success');
       load();
     } catch (err) {
       await alert('Kayıt işlemi başarısız: ' + (err.message || JSON.stringify(err)), 'Hata', 'error');
@@ -241,26 +181,25 @@ export default function CoordinatorUsers() {
   };
 
   const roleLabels = {
-    admin: 'Sistem Yöneticisi',
     coordinator: 'Bölüm/Program Başkanı',
     program_head: 'Bölüm/Program Başkanı',
     instructor: 'Öğretim Elemanı'
   };
 
   const roleBadgeStyles = {
-    admin: 'bg-purple-100 text-purple-800 border border-purple-200',
     coordinator: 'bg-blue-100 text-blue-800 border border-blue-200',
     program_head: 'bg-blue-100 text-blue-800 border border-blue-200',
     instructor: 'bg-emerald-100 text-emerald-800 border border-emerald-200'
   };
 
-  // Filtered users list
+  // Filtered users list (Admins are completely excluded)
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
+      if (u.role === 'admin') return false;
+
       // Role filter
       if (roleFilter === 'instructor' && u.role !== 'instructor') return false;
       if (roleFilter === 'coordinator' && u.role !== 'coordinator' && u.role !== 'program_head') return false;
-      if (roleFilter === 'admin' && u.role !== 'admin') return false;
 
       // Text search
       if (search.trim()) {
@@ -277,13 +216,11 @@ export default function CoordinatorUsers() {
   const counts = useMemo(() => {
     let instructors = 0;
     let coordinators = 0;
-    let admins = 0;
     users.forEach(u => {
-      if (u.role === 'admin') admins++;
+      if (u.role === 'instructor') instructors++;
       else if (u.role === 'coordinator' || u.role === 'program_head') coordinators++;
-      else if (u.role === 'instructor') instructors++;
     });
-    return { all: users.length, instructors, coordinators, admins };
+    return { all: instructors + coordinators, instructors, coordinators };
   }, [users]);
 
   return (
@@ -293,7 +230,7 @@ export default function CoordinatorUsers() {
         <div>
           <h2 className="text-display-md text-on-surface font-bold">Kullanıcı Yönetimi</h2>
           <p className="text-on-surface-variant font-body-md mt-1">
-            Bölümünüze bağlı öğretim elemanlarını ekleyebilir, tüm sistem kullanıcılarını görüntüleyebilirsiniz.
+            Bölümünüze bağlı öğretim elemanlarını ekleyebilir, mevcut kullanıcıları listeleyip yönetebilirsiniz.
           </p>
         </div>
         <button
@@ -344,17 +281,6 @@ export default function CoordinatorUsers() {
             >
               Bölüm / Program Başkanları ({counts.coordinators})
             </button>
-            <button
-              type="button"
-              onClick={() => setRoleFilter('admin')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-                roleFilter === 'admin'
-                  ? 'bg-white text-purple-700 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Sistem Yöneticileri ({counts.admins})
-            </button>
           </div>
 
           {/* Search Input */}
@@ -373,19 +299,12 @@ export default function CoordinatorUsers() {
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             )}
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
-          <span className="material-symbols-outlined text-sm text-amber-600">info</span>
-          <span>
-            <b>Bilgi:</b> Tüm kullanıcılar listelenmektedir. Sistem Yöneticisi (Admin) hesapları korumalıdır ve üzerinde işlem yapılamaz.
-          </span>
         </div>
       </div>
 
@@ -422,7 +341,7 @@ export default function CoordinatorUsers() {
                 </tr>
               ) : (
                 filteredUsers.map((u) => {
-                  const isAdmin = u.role === 'admin';
+                  const isCoord = u.role === 'coordinator' || u.role === 'program_head';
                   const initials = u.name
                     ? u.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
                     : '??';
@@ -430,32 +349,21 @@ export default function CoordinatorUsers() {
                   return (
                     <tr
                       key={u.id}
-                      className={`hover:bg-slate-50/80 transition-colors group ${
-                        isAdmin ? 'bg-purple-50/20' : ''
-                      }`}
+                      className="hover:bg-slate-50/80 transition-colors group"
                     >
                       {/* User Info */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                              isAdmin
-                                ? 'bg-purple-100 text-purple-800'
-                                : u.role === 'coordinator' || u.role === 'program_head'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                              isCoord ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
                             }`}
                           >
                             {initials}
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
-                              <span>{u.title ? `${u.title} ${u.name}` : u.name}</span>
-                              {isAdmin && (
-                                <span className="material-symbols-outlined text-purple-600 text-xs" title="Sistem Yöneticisi">
-                                  shield_person
-                                </span>
-                              )}
+                            <div className="font-semibold text-slate-800 text-sm">
+                              {u.title ? `${u.title} ${u.name}` : u.name}
                             </div>
                             <div className="text-slate-400 text-xs font-mono">{u.email}</div>
                           </div>
@@ -476,7 +384,7 @@ export default function CoordinatorUsers() {
 
                       {/* Assigned Programs */}
                       <td className="px-4 py-3">
-                        {u.role === 'program_head' || u.role === 'coordinator' ? (
+                        {isCoord ? (
                           <div className="flex flex-col gap-1 max-w-xs">
                             {programs.filter(p => p.head === u.id).map(p => (
                               <div key={p.id} className="text-xs text-primary font-semibold flex items-center gap-1">
@@ -495,61 +403,40 @@ export default function CoordinatorUsers() {
                         )}
                       </td>
 
-                      {/* Active Status */}
+                      {/* Active Status (Read-only for Coordinator) */}
                       <td className="px-4 py-3 text-center">
-                        {isAdmin ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full cursor-not-allowed select-none"
-                            title="Admin hesap durumu değiştirilemez"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">lock</span>
+                        {u.active !== false ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 select-none">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                             Aktif
                           </span>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => toggleActive(u)}
-                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              u.active !== false ? 'bg-emerald-600' : 'bg-slate-300'
-                            }`}
-                            title={u.active !== false ? 'Pasife Al' : 'Aktif Yap'}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                u.active !== false ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 select-none">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            Pasif
+                          </span>
                         )}
                       </td>
 
-                      {/* Actions */}
+                      {/* Actions (Only Edit for Instructors, No Delete) */}
                       <td className="px-4 py-3 text-right">
-                        {isAdmin ? (
+                        {isCoord ? (
                           <span
                             className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md cursor-not-allowed select-none"
-                            title="Sistem yöneticisi hesapları üzerinde işlem yapma yetkisi bulunmamaktadır."
+                            title="Bölüm Başkanı hesapları üzerinde işlem yapılamaz."
                           >
                             <span className="material-symbols-outlined text-xs">lock</span>
-                            İşlem Yetkisi Yok
+                            Düzenlenemez
                           </span>
                         ) : (
-                          <div className="flex justify-end gap-1 items-center">
+                          <div className="flex justify-end items-center">
                             <button
                               type="button"
                               onClick={() => handleEdit(u)}
                               className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-primary rounded-lg transition-colors cursor-pointer"
-                              title="Düzenle"
+                              title="Bilgileri Düzenle"
                             >
                               <span className="material-symbols-outlined text-base">edit</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(u.id)}
-                              className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                              title="Sil"
-                            >
-                              <span className="material-symbols-outlined text-base">delete</span>
                             </button>
                           </div>
                         )}
@@ -578,7 +465,7 @@ export default function CoordinatorUsers() {
                   {editItem ? 'manage_accounts' : 'person_add'}
                 </span>
                 <h3 className="text-base font-bold text-slate-800">
-                  {editItem ? 'Kullanıcı Düzenle' : 'Yeni Öğretim Elemanı Ekle'}
+                  {editItem ? 'Öğretim Elemanı Düzenle' : 'Yeni Öğretim Elemanı Ekle'}
                 </h3>
               </div>
               <button
@@ -682,20 +569,16 @@ export default function CoordinatorUsers() {
                 </div>
               )}
 
-              {/* Role Selection (Admin is deliberately omitted) */}
+              {/* Fixed Role & Faculty Selection */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Rol <span className="text-rose-500">*</span>
+                    Rol
                   </label>
-                  <select
-                    value={form.role}
-                    onChange={e => setForm({ ...form, role: e.target.value })}
-                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
-                  >
-                    <option value="instructor">Öğretim Elemanı</option>
-                    <option value="program_head">Bölüm/Program Başkanı</option>
-                  </select>
+                  <div className="w-full border border-slate-200 bg-slate-100 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 flex items-center justify-between cursor-not-allowed select-none">
+                    <span>Öğretim Elemanı</span>
+                    <span className="material-symbols-outlined text-xs text-slate-400" title="Bölüm Başkanı yalnızca Öğretim Elemanı rolünde ekleme yapabilir">lock</span>
+                  </div>
                 </div>
 
                 {/* Faculty Selection */}
@@ -715,42 +598,6 @@ export default function CoordinatorUsers() {
                   </select>
                 </div>
               </div>
-
-              {/* Program assignment (Only when role is program_head) */}
-              {form.role === 'program_head' && (
-                <div className="space-y-1.5 pt-1 border-t border-slate-100">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                    Atanacağı Bölümler / Programlar
-                  </label>
-                  <div className="border border-outline-variant rounded-lg p-3 max-h-36 overflow-y-auto space-y-1.5 bg-slate-50">
-                    {programs.map(p => {
-                      const isChecked = form.programIds?.includes(p.id);
-                      return (
-                        <label
-                          key={p.id}
-                          className="flex items-center gap-2.5 text-xs font-medium text-slate-800 cursor-pointer select-none hover:bg-white p-1 rounded transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked || false}
-                            onChange={(e) => {
-                              const nextIds = e.target.checked
-                                ? [...(form.programIds || []), p.id]
-                                : (form.programIds || []).filter(id => id !== p.id);
-                              setForm({ ...form, programIds: nextIds });
-                            }}
-                            className="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4"
-                          />
-                          <span>{p.name}</span>
-                        </label>
-                      );
-                    })}
-                    {programs.length === 0 && (
-                      <p className="text-xs text-slate-400 text-center py-2">Sistemde kayıtlı program bulunmuyor.</p>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Modal Footer Actions */}
               <div className="pt-4 border-t border-slate-200 flex justify-end gap-2.5">
